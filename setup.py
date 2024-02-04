@@ -15,7 +15,7 @@ setup(
     author="Johannes Habel",
     author_email="EchterAlsFake@proton.me",
     description="A Python API for the Porn Site xvideos.com",
-    long_description=open('/home/asuna/PycharmProjects/xvideos_api/README.md').read(),
+    long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     license="LGPLv3",
     url="https://github.com/EchterAlsFake/xvideos_api",
