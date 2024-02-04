@@ -45,7 +45,7 @@ video_object.download(downloader=threaded, quality=Quality.BEST, output_path="yo
 ```
 
 # Changelog
-See [Changelog](https://github.com/EchterAlsFake/xnxx_api/blob/master/README/Changelog.md) for more details.
+See [Changelog](https://github.com/EchterAlsFake/xvideos_api/blob/master/README/Changelog.md) for more details.
 
 # Contribution
 Do you see any issues or having some feature requests? Simply open an Issue or talk
