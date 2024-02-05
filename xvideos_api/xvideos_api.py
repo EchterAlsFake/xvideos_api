@@ -51,7 +51,6 @@ class Video:
         self.json_data = self.flatten_json(nested_json=self.extract_json_from_html())
         self.script_content = self.get_script_content()
 
-
     @classmethod
     def check_url(cls, url):
         match = REGEX_VIDEO_CHECK_URL.match(url)
@@ -272,27 +271,40 @@ class Client:
         return Video(url)
 
     @classmethod
-    def search(cls, query, sorting_Sort: Sort, sorting_Date: SortDate, sorting_Time: SortVideoTime,
-               sort_Quality: SortQuality, pages=2):
+    def extract_video_urls(cls, html_content):
+        # Parse the HTML content with BeautifulSoup
+        soup = BeautifulSoup(html_content, 'lxml')
+        video_urls = []
+
+        # Find all 'div' elements with the class 'thumb'
+        thumb_divs = soup.find_all('div', class_='thumb')
+
+        # Iterate over each 'thumb' div and extract the 'href' attribute from the 'a' tag within it
+        for div in thumb_divs:
+            a_tag = div.find('a', href=True)  # Find the first 'a' tag with an 'href' attribute
+            if a_tag and a_tag['href']:  # Ensure the 'a' tag and its 'href' attribute exist
+                video_urls.append(a_tag['href'])
+
+        return video_urls
+
+    @classmethod
+    def search(cls, query, sorting_Sort: Sort = Sort.Sort_relevance, sorting_Date: SortDate = SortDate.Sort_all,
+               sorting_Time: SortVideoTime = SortVideoTime.Sort_all, sort_Quality: SortQuality = SortQuality.Sort_all,
+               pages=2):
+
+        query = query.replace(" ", "+")
 
         url = f"https://www.xvideos.com/?k={query}&sort={sorting_Sort}%&datef={sorting_Date}&durf={sorting_Time}&quality={sort_Quality}"
-        videos_ids = []
-
+        urls = []
         for page in range(pages):
             response = requests.get(f"{url}&p={page}").content.decode("utf-8")
-            list_ids = REGEX_SEARCH_SCRAPE_VIDEOS.findall(response)
+            urls_ = Client.extract_video_urls(response)
 
-            for video_id in list_ids:
-                videos_ids.append(video_id)
+            for url in urls_:
+                url = f"https://www.xvideos.com{url}"
 
-        for id in videos_ids:
-            yield Video(f"https://xvideos.com/video{id}")
+                if REGEX_VIDEO_CHECK_URL.match(url):
+                    urls.append(url)
 
-
-
-
-
-Client().search(query="mia", sort_Quality=SortQuality.Sort_720p, sorting_Sort=Sort.Sort_rating, sorting_Date=SortDate.Sort_all, sorting_Time=SortVideoTime.Sort_long)
-
-
-
+        for id in urls:
+            yield Video(id)

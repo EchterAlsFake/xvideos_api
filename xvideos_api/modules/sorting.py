@@ -17,6 +17,7 @@ class SortDate:
 
 
 class SortVideoTime:
+    Sort_all = "allduration"
     Sort_short = "1-3min"
     Sort_middle = "3-10min"
     Sort_long = "10min_more"
