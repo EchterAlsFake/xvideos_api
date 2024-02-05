@@ -28,6 +28,7 @@ try:
     from modules.locals import *
     from modules.progress_bars import *
     from modules.download import *
+    from modules.sorting import *
 
 except (ModuleNotFoundError, ImportError):
     from .modules.consts import *
@@ -35,6 +36,7 @@ except (ModuleNotFoundError, ImportError):
     from .modules.locals import *
     from .modules.progress_bars import *
     from .modules.download import *
+    from .modules.sorting import *
 
 
 class Video:
@@ -262,12 +264,35 @@ class Video:
     def pornstars(self) -> list:
         return REGEX_VIDEO_PORNSTARS.findall(self.html_content)
 
+
 class Client:
 
     @classmethod
     def get_video(cls, url):
         return Video(url)
 
+    @classmethod
+    def search(cls, query, sorting_Sort: Sort, sorting_Date: SortDate, sorting_Time: SortVideoTime,
+               sort_Quality: SortQuality, pages=2):
 
-c = Client()
-video = c.get_video("https://www.xvideos.com/video79841319/if_you_like_to_swim_naked_you_also_like_to_get_a_dick_in_the_ass")
+        url = f"https://www.xvideos.com/?k={query}&sort={sorting_Sort}%&datef={sorting_Date}&durf={sorting_Time}&quality={sort_Quality}"
+        videos_ids = []
+
+        for page in range(pages):
+            response = requests.get(f"{url}&p={page}").content.decode("utf-8")
+            list_ids = REGEX_SEARCH_SCRAPE_VIDEOS.findall(response)
+
+            for video_id in list_ids:
+                videos_ids.append(video_id)
+
+        for id in videos_ids:
+            yield Video(f"https://xvideos.com/video{id}")
+
+
+
+
+
+Client().search(query="mia", sort_Quality=SortQuality.Sort_720p, sorting_Sort=Sort.Sort_rating, sorting_Date=SortDate.Sort_all, sorting_Time=SortVideoTime.Sort_long)
+
+
+

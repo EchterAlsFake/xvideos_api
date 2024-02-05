@@ -11,3 +11,5 @@ REGEX_VIDEO_COMMENT_COUNT = re.compile(r'<span class="badge">(.*?)</span>')
 REGEX_VIDEO_UPLOADER = re.compile(r'<a href="/channels/(.*?)" class="btn btn-default label main')
 REGEX_VIDEO_LENGTH = re.compile(r'<span class="duration">(.*?)</span>')
 REGEX_VIDEO_PORNSTARS = re.compile(r'a href="/models/(.*?)" class=')
+
+REGEX_SEARCH_SCRAPE_VIDEOS = re.compile(r'<div id="video_(.*?)" data-id="')
