@@ -294,10 +294,10 @@ class Client:
 
         query = query.replace(" ", "+")
 
-        url = f"https://www.xvideos.com/?k={query}&sort={sorting_Sort}%&datef={sorting_Date}&durf={sorting_Time}&quality={sort_Quality}"
+        base_url = f"https://www.xvideos.com/?k={query}&sort={sorting_Sort}%&datef={sorting_Date}&durf={sorting_Time}&quality={sort_Quality}"
         urls = []
         for page in range(pages):
-            response = requests.get(f"{url}&p={page}").content.decode("utf-8")
+            response = requests.get(f"{base_url}&p={page}").content.decode("utf-8")
             urls_ = Client.extract_video_urls(response)
 
             for url in urls_:
