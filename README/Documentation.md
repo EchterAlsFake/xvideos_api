@@ -1,6 +1,6 @@
 # XNXX API Documentation
 
-> - Version 1.0
+> - Version 1.1
 > - Author: Johannes Habel
 > - Copryight (C) 2024
 > - License: GPL 3
@@ -19,6 +19,9 @@ The ToS of xvideos.com clearly say, that using scrapers / bots isn't allowed.
     - [Attributes](#attributes)
     - [Downloading](#downloading-a-video)
     - [Custom callback](#custom-callback-for-downloading--videos)
+- [Searching Videos](#searching)
+    - [Basic Search](#basic-search)
+    - [Using Filters](#using-filters)
 
 - [Locals](#locals)
   - [Quality](#the-quality-object)
@@ -118,6 +121,45 @@ def custom_callback(pos, total):
 ```
 
 When downloading a video, you can just specify your callback functions in the `callback` argument
+
+# Searching
+
+## Basic Search
+
+```python
+from xvideos_api.xvideos_api import Client
+
+client = Client()
+videos = client.search("Mia Khalifa", pages=2)
+
+for video in videos:
+  print(video.title)
+```
+
+- One Page contains 27 videos
+- Search filters are by default the ones from xvideos
+
+## Using Filters
+
+```python
+from xvideos_api.modules.sorting import SortDate, Sort, SortQuality, SortVideoTime
+from xvideos_api.xvideos_api import Client
+
+client = Client()
+videos = Client.search("Mia Khalifa", pages=1, sorting_Date=SortDate.Sort_all, sort_Quality=SortQuality.Sort_720p,
+                        sorting_Sort=Sort.Sort_relevance, sorting_Time=SortVideoTime.Sort_short)
+
+# If you don't specify filters, the default from xvideos.com will be used!
+```
+
+- Sort: Sorts videos by relevance, views and stuff
+- SortQuality: Sorts videos by their quality
+- SortDate: Sorts videos by upload date
+- SortVideoTime: Sorts videos by their length
+
+
+
+
 
 
 # Locals
