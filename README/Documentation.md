@@ -58,7 +58,7 @@ The video object has the following values:
 | Attribute      | Returns | is cached? |
 |:---------------|:-------:|:----------:|
 | .title         |   str   |    Yes     |
-| .uploader      |   str   |    Yes     |
+| .author        |   str   |    Yes     |
 | .length        |   str   |    Yes     |
 | .views         |   str   |    Yes     |
 | .comment_count |   str   |    Yes     |
@@ -67,7 +67,7 @@ The video object has the following values:
 | .rating_votes  |   str   |    Yes     |
 | .pornstars     |  list   |    Yes     |
 | .description   |   str   |    Yes     |
-| .keywords      |  list   |    Yes     |
+| .tags          |  list   |    Yes     |
 | .thumbnail_url |  list   |    Yes     |
 | .upload_date   |   str   |    Yes     |
 | .content_url   |   str   |    Yes     |

@@ -228,7 +228,7 @@ class Video:
         return html.unescape(self.json_data["contentUrl"])
 
     @cached_property
-    def keywords(self) -> list:
+    def tags(self) -> list:
         return REGEX_VIDEO_TAGS.findall(self.html_content)
 
     @cached_property
@@ -252,7 +252,7 @@ class Video:
         return REGEX_VIDEO_COMMENT_COUNT.search(self.html_content).group(1)
 
     @cached_property
-    def uploader(self) -> str:
+    def author(self) -> str:
         try:
             uploader = REGEX_VIDEO_UPLOADER.search(self.html_content).group(1)
         except AttributeError:
