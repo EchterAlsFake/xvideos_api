@@ -253,7 +253,13 @@ class Video:
 
     @cached_property
     def uploader(self) -> str:
-        return REGEX_VIDEO_UPLOADER.search(self.html_content).group(1)
+        try:
+            uploader = REGEX_VIDEO_UPLOADER.search(self.html_content).group(1)
+        except AttributeError:
+            uploader = "Unknown"
+
+        return uploader
+
 
     @cached_property
     def length(self) -> str:
