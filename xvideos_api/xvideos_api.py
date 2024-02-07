@@ -220,7 +220,7 @@ class Video:
         return html.unescape(self.json_data["thumbnailUrl"])[0]
 
     @cached_property
-    def upload_date(self) -> str:
+    def publish_date(self) -> str:
         return html.unescape(self.json_data["uploadDate"])
 
     @cached_property

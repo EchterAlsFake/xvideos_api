@@ -12,7 +12,7 @@ def test_title():
 
 
 def test_uploader():
-    assert isinstance(video.uploader, str) and len(video.uploader) > 0
+    assert isinstance(video.author, str) and len(video.author) > 0
 
 
 def test_length():
@@ -43,16 +43,16 @@ def test_description():
     assert isinstance(video.description, str) and len(video.description) > 0
 
 
-def test_keywords():
-    assert isinstance(video.keywords, list) and len(video.keywords) > 0
+def test_tags():
+    assert isinstance(video.tags, list) and len(video.tags) > 0
 
 
 def test_thumbnail_url():
     assert isinstance(video.thumbnail_url, str) and len(video.thumbnail_url) > 0
 
 
-def test_upload_date():
-    assert isinstance(video.upload_date, str) and len(video.upload_date) > 0
+def test_publish_date():
+    assert isinstance(video.publish_date, str) and len(video.publish_date) > 0
 
 
 def test_content_url():

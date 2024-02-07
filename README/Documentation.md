@@ -69,7 +69,7 @@ The video object has the following values:
 | .description   |   str   |    Yes     |
 | .tags          |  list   |    Yes     |
 | .thumbnail_url |  list   |    Yes     |
-| .upload_date   |   str   |    Yes     |
+| .publish_date  |   str   |    Yes     |
 | .content_url   |   str   |    Yes     |
 
 ### Downloading a Video:
