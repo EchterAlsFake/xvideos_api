@@ -1,5 +1,7 @@
 import re
 
+headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'}
+
 REGEX_VIDEO_CHECK_URL = re.compile(r'https://www.xvideos.com/video(.*?)')
 REGEX_VIDEO_M3U8 = re.compile(r"html5player\.setVideoHLS\('([^']+)'\);")
 REGEX_VIDEO_TAGS = re.compile(r'href="/tags/(.*?)" class="is-keyword', re.DOTALL)

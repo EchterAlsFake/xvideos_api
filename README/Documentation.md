@@ -90,7 +90,7 @@ When downloading a video you can give a `downloader` argument which represents a
 You can import the three downloaders using:
 
 ```python
-from xvideos_api.modules.download import default, threaded, FFMPEG
+from base_api.modules.download import FFMPEG, threaded, default
 from xvideos_api.xvideos_api import Client, Quality, Callback
 
 client = Client()
@@ -169,7 +169,7 @@ videos = Client.search("Mia Khalifa", pages=1, sorting_Date=SortDate.Sort_all, s
 First: Import the Quality object:
 
 ```python
-from xvideos_api.xvideos_api import Quality
+from base_api.base import Quality
 ```
 
 There are three quality types:

@@ -15,7 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-import requests
 import json
 import html
 
@@ -25,28 +24,19 @@ from functools import cached_property
 try:
     from modules.consts import *
     from modules.exceptions import *
-    from modules.locals import *
-    from modules.progress_bars import *
-    from modules.download import *
     from modules.sorting import *
 
 except (ModuleNotFoundError, ImportError):
     from .modules.consts import *
     from .modules.exceptions import *
-    from .modules.locals import *
-    from .modules.progress_bars import *
-    from .modules.download import *
     from .modules.sorting import *
 
+from base_api.base import Core
+from base_api.modules.quality import Quality
 
 class Video:
     def __init__(self, url):
         self.url = self.check_url(url)
-        self.session = requests.Session()
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'}
-
-        self.session.headers.update(headers)
-
         self.html_content = self.get_html_content()
         self.json_data = self.flatten_json(nested_json=self.extract_json_from_html())
         self.script_content = self.get_script_content()
@@ -73,7 +63,7 @@ class Video:
         return target_script.text
 
     def get_html_content(self):
-        return self.session.get(self.url).content.decode("utf-8")
+        return Core().get_content(self.url, headers=headers).decode("utf-8")
 
     def extract_json_from_html(self):
         soup = BeautifulSoup(self.html_content, 'lxml')
@@ -107,9 +97,8 @@ class Video:
         return dict(items)
 
     def get_available_qualities(self):
-        response = self.session.get(self.m3u8_base_url)
-        content = response.content.decode("utf-8")
-        lines = content.splitlines()
+        response = Core().get_content(self.m3u8_base_url, headers=headers).decode("utf-8")
+        lines = response.splitlines()
 
         quality_url_map = {}
         base_qualities = ["250p", "360p", "480p", "720p", "1080p"]
@@ -124,7 +113,7 @@ class Video:
         return self.available_qualities
 
     def get_m3u8_by_quality(self, quality):
-        quality = self.fix_quality(quality)
+        quality = Core().fix_quality(quality)
 
         self.get_available_qualities()
         base_qualities = ["250p", "360p", "480p", "720p", "1080p"]
@@ -141,7 +130,7 @@ class Video:
 
     def get_segments(self, quality):
 
-        quality = self.fix_quality(quality)
+        quality = Core().fix_quality(quality)
 
         # Some inspiration from PHUB (xD)
         base_url = self.m3u8_base_url
@@ -154,7 +143,7 @@ class Video:
 
         # Rejoin the components into the new full URL
         new_url = '/'.join(url_components)
-        master_src = self.session.get(url=new_url).text
+        master_src = Core().get_content(url=new_url).decode("utf-8")
 
         urls = [l for l in master_src.splitlines()
                 if l and not l.startswith('#')]
@@ -164,23 +153,6 @@ class Video:
             new_url = '/'.join(url_components)
             yield new_url
 
-    @classmethod
-    def fix_quality(cls, quality):
-        # Needed for Porn Fetch
-
-        if isinstance(quality, Quality):
-            return quality
-
-        else:
-            if str(quality) == "best":
-                return Quality.BEST
-
-            elif str(quality) == "half":
-                return Quality.HALF
-
-            elif str(quality) == "worst":
-                return Quality.WORST
-
     def download(self, downloader, quality, output_path, callback=None):
         """
         :param callback:
@@ -189,20 +161,8 @@ class Video:
         :param output_path:
         :return:
         """
-        quality = self.fix_quality(quality)
-
-        if callback is None:
-            callback = Callback.text_progress_bar
-
-        if downloader == default or str(downloader) == "default":
-            default(video=self, quality=quality, path=output_path, callback=callback)
-
-        elif downloader == threaded or str(downloader) == "threaded":
-            download_video_threaded = threaded(20, 10)
-            download_video_threaded(video=self, quality=quality, path=output_path, callback=callback)
-
-        elif downloader == FFMPEG or str(downloader) == "FFMPEG":
-            FFMPEG(video=self, quality=quality, path=output_path, callback=callback)
+        quality = Core().fix_quality(quality)
+        Core().download(video=self, quality=quality, output_path=output_path, callback=callback, downloader=downloader)
 
     @cached_property
     def m3u8_base_url(self) -> str:
@@ -304,7 +264,7 @@ class Client:
         base_url = f"https://www.xvideos.com/?k={query}&sort={sorting_Sort}%&datef={sorting_Date}&durf={sorting_Time}&quality={sort_Quality}"
         urls = []
         for page in range(pages):
-            response = requests.get(f"{base_url}&p={page}").content.decode("utf-8")
+            response = Core().get_content(f"{base_url}&p={page}", headers=headers).decode("utf-8")
             urls_ = Client.extract_video_urls(response)
 
             for url in urls_:
