@@ -3,14 +3,14 @@
 > - Version 1.1
 > - Author: Johannes Habel
 > - Copryight (C) 2024
-> - License: GPL 3
-> - Dependencies: requests, lxml, bs4, ffmpeg-progress-yield 
-> - Optional dependency: ffmpeg (installed in path)
+> - License: LGPLv3
+> - Dependencies: requests, lxml, bs4, ffmpeg-progress-yield, eaf_base_api
+> - Optional dependency: ffmpeg (installed in your path)
 
 
 # Important Notice
-The ToS of xvideos.com clearly say, that using scrapers / bots isn't allowed.
-> Using this API is on your risk. I am not liable for your actions!
+The ToS of xvideos.com clearly say that using scrapers / bots isn't allowed.
+> Using this API is at your risk. I am not liable for your actions!
 
 # Table of Contents
 - [Importing the API](#importing-the-api)
@@ -28,10 +28,11 @@ The ToS of xvideos.com clearly say, that using scrapers / bots isn't allowed.
 
 # Importing the API
 
-#### To import all modules you should use the following:
+#### To import all modules, you should use the following:
 
 ```python
 from xvideos_api.xvideos_api import Client, Quality
+from base_api.modules.download import threaded, default, FFMPEG
 ```
 
 # Initializing the Client
@@ -44,7 +45,6 @@ from xvideos_api.xvideos_api import Client
 client = Client()
 
 # Now you can fetch a Video object:
-
 video = client.get_video("<video_url")
 ```
 
@@ -85,7 +85,7 @@ There are three ways of downloading videos:
 
 > If you get problems with video stuttering: Use FFMPEG!
 > 
-When downloading a video you can give a `downloader` argument which represents a downloader.
+When downloading a video, you can give a `downloader` argument which represents a downloader.
 
 You can import the three downloaders using:
 
@@ -100,14 +100,14 @@ video.download(downloader=threaded, quality=Quality.BEST, output_path="./IdontKn
 # This will save the video in the current working directory with the filename "IdontKnow.mp4"
 ```
 
-### Custom Callback for downloading  videos
+### Custom Callback for downloading videos
 
 You may want to specify a custom callback for downloading videos. Luckily for you, I made it as easy as
 possible :)
 
 1. Create a callback function, which takes `pos` and `total` as arguments.
-2. `pos` represents the current amount of downloaded segments
-3. `total` represents the total amount of segments
+2. `pos` represents the current number of downloaded segments
+3. `total` represents the total number of segments
 
 Here's an example:
 
@@ -117,10 +117,10 @@ def custom_callback(pos, total):
 
     percentage = (pos / total) * 100
     print(f"Downloaded: {pos} segments / {total} segments ({percentage:.2f}%)")
-    # You see it's really simple :)
+    # You see, it's really simple :)
 ```
 
-When downloading a video, you can just specify your callback functions in the `callback` argument
+When downloading a video, you can specify your callback functions in the `callback` argument
 
 # Searching
 
@@ -158,10 +158,6 @@ videos = Client.search("Mia Khalifa", pages=1, sorting_Date=SortDate.Sort_all, s
 - SortVideoTime: Sorts videos by their length
 
 
-
-
-
-
 # Locals
 
 ## The Quality Object
@@ -178,5 +174,5 @@ There are three quality types:
 - Quality.HALF
 - Quality.WORST
 
-> - You can also pass a string instead of a Quality object. e.g instead of `Quality.BEST`, you can say `best`
-> - Same goes for threading modes. Instead of `download.threaded` you can just say `threaded` as a string
+> - You can also pass a string instead of a Quality object. e.g., instead of `Quality.BEST`, you can say `best`
+> - The same goes for threading modes. Instead of `download.threaded` you can just say `threaded` as a string

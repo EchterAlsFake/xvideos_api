@@ -20,6 +20,8 @@ import html
 
 from bs4 import BeautifulSoup
 from functools import cached_property
+from base_api.base import Core, threaded, default, FFMPEG
+from base_api.modules.quality import Quality
 
 try:
     from modules.consts import *
@@ -31,18 +33,25 @@ except (ModuleNotFoundError, ImportError):
     from .modules.exceptions import *
     from .modules.sorting import *
 
-from base_api.base import Core
-from base_api.modules.quality import Quality
 
 class Video:
     def __init__(self, url):
+        """
+        :param url: (str) The URL of the video
+        """
         self.url = self.check_url(url)
         self.html_content = self.get_html_content()
         self.json_data = self.flatten_json(nested_json=self.extract_json_from_html())
         self.script_content = self.get_script_content()
+        self.quality_url_map = None
+        self.available_qualities = None
 
     @classmethod
-    def check_url(cls, url):
+    def check_url(cls, url) -> str:
+        """
+        :param url: (str) The URL of the video
+        :return: (str) The URL of the video, if valid, otherwise raises InvalidUrl Exception
+        """
         match = REGEX_VIDEO_CHECK_URL.match(url)
         if match:
             return url
@@ -96,7 +105,10 @@ class Video:
                 items.append((new_key, v))
         return dict(items)
 
-    def get_available_qualities(self):
+    def get_available_qualities(self) -> list:
+        """
+        :return: (list) List of available qualities
+        """
         response = Core().get_content(self.m3u8_base_url, headers=headers).decode("utf-8")
         lines = response.splitlines()
 
@@ -113,6 +125,10 @@ class Video:
         return self.available_qualities
 
     def get_m3u8_by_quality(self, quality):
+        """
+        :param quality: (str, Quality) The video quality
+        :return: (str) The m3u8 URL for the given quality
+        """
         quality = Core().fix_quality(quality)
 
         self.get_available_qualities()
@@ -128,30 +144,14 @@ class Video:
 
         return self.quality_url_map.get(selected_quality)
 
-    def get_segments(self, quality):
-
+    def get_segments(self, quality) -> list:
+        """
+        :param quality: (str, Quality) The video quality
+        :return: (list) A list of segments (the .ts files)
+        """
         quality = Core().fix_quality(quality)
-
-        # Some inspiration from PHUB (xD)
-        base_url = self.m3u8_base_url
-        new_segment = self.get_m3u8_by_quality(quality)
-        # Split the base URL into components
-        url_components = base_url.split('/')
-
-        # Replace the last component with the new segment
-        url_components[-1] = new_segment
-
-        # Rejoin the components into the new full URL
-        new_url = '/'.join(url_components)
-        master_src = Core().get_content(url=new_url).decode("utf-8")
-
-        urls = [l for l in master_src.splitlines()
-                if l and not l.startswith('#')]
-
-        for url in urls:
-            url_components[-1] = url
-            new_url = '/'.join(url_components)
-            yield new_url
+        segments = Core().get_segments(quality=quality, m3u8_base_url=self.m3u8_base_url)
+        return segments
 
     def download(self, downloader, quality, output_path, callback=None):
         """
@@ -216,11 +216,11 @@ class Video:
     def author(self) -> str:
         try:
             uploader = REGEX_VIDEO_UPLOADER.search(self.html_content).group(1)
+
         except AttributeError:
             uploader = "Unknown"
 
         return uploader
-
 
     @cached_property
     def length(self) -> str:
@@ -235,6 +235,10 @@ class Client:
 
     @classmethod
     def get_video(cls, url):
+        """
+        :param url: (str) The video URL
+        :return: (Video) The video object
+        """
         return Video(url)
 
     @classmethod

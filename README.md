@@ -7,16 +7,12 @@
 </div>
 
 # Description
- 
-xvideos API is an API for xvideos.com. It allows you to fetch information from videos using regexes and requests.
+XVideos API is an API for xvideos.com. It allows you to fetch information from videos using regexes and requests.
 
 # Disclaimer
-
-[!IMPORTANT] The xvideos API is in violation to xvideos's ToS!
-
-Copyright Information: I have no intention of stealing copyright protected content or slowing down
-a website. Contact me at my E-Mail, and I'll take this Repository immediately offline.
-
+> [!IMPORTANT] 
+> XVideos API is in violation to the ToS of xvideos.com!
+> If you are the website owner of xvideos.com, contact me at my E-Mail, and I'll take this repository immediately offline.
 > EchterAlsFake@proton.me
 
 # Quickstart
@@ -27,7 +23,8 @@ a website. Contact me at my E-Mail, and I'll take this Repository immediately of
 
 
 ```python
-from xvideos_api.xvideos_api import Client, Quality, threaded
+from xvideos_api.xvideos_api import Client, Quality
+from base_api.modules.download import threaded, default, FFMPEG
 # Initialize a Client object
 client = Client()
 
@@ -57,9 +54,3 @@ Pull requests are also welcome.
 Licensed under the LGPLv3 License
 
 Copyright (C) 2023–2024 Johannes Habel
-
-# Support
-
-Leave a star on the repository. That's enough :) 
-
-
