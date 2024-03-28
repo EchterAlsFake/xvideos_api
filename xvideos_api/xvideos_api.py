@@ -153,7 +153,7 @@ class Video:
         segments = Core().get_segments(quality=quality, m3u8_base_url=self.m3u8_base_url)
         return segments
 
-    def download(self, downloader, quality, output_path, callback=None):
+    def download(self, downloader, quality, path, callback=None):
         """
         :param callback:
         :param downloader:
@@ -162,7 +162,7 @@ class Video:
         :return:
         """
         quality = Core().fix_quality(quality)
-        Core().download(video=self, quality=quality, output_path=output_path, callback=callback, downloader=downloader)
+        Core().download(video=self, quality=quality, path=path, callback=callback, downloader=downloader)
 
     @cached_property
     def m3u8_base_url(self) -> str:

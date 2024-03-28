@@ -91,11 +91,12 @@ You can import the three downloaders using:
 
 ```python
 from base_api.modules.download import FFMPEG, threaded, default
-from xvideos_api.xvideos_api import Client, Quality, Callback
+from xvideos_api.xvideos_api import Client, Quality
+from base_api.modules.progress_bars import Callback
 
 client = Client()
 video = client.get_video("...")
-video.download(downloader=threaded, quality=Quality.BEST, output_path="./IdontKnow.mp4", callback=Callback.text_progress_bar) 
+video.download(downloader=threaded, quality=Quality.BEST, path="./IdontKnow.mp4", callback=Callback.text_progress_bar) 
                                             # See Locals
 # This will save the video in the current working directory with the filename "IdontKnow.mp4"
 ```
