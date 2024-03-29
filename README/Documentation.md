@@ -71,6 +71,7 @@ The video object has the following values:
 | .thumbnail_url |  list   |    Yes     |
 | .publish_date  |   str   |    Yes     |
 | .content_url   |   str   |    Yes     |
+| .embed_url     |   str   |    Yes     |
 
 ### Downloading a Video:
 

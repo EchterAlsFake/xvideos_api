@@ -63,7 +63,7 @@ class Video:
     def is_desired_script(cls, tag):
         if tag.name != "script":
             return False
-        script_contents = ['html5player', 'setVideoTitle', 'setVideoUrlLow', 'setVideoUrlHigh']
+        script_contents = ['html5player', 'setVideoTitle', 'setVideoUrlLow']
         return all(content in tag.text for content in script_contents)
 
     def get_script_content(self):
@@ -158,7 +158,7 @@ class Video:
         :param callback:
         :param downloader:
         :param quality:
-        :param output_path:
+        :param path:
         :return:
         """
         quality = Core().fix_quality(quality)
@@ -229,6 +229,10 @@ class Video:
     @cached_property
     def pornstars(self) -> list:
         return REGEX_VIDEO_PORNSTARS.findall(self.html_content)
+
+    @cached_property
+    def embed_url(self) -> str:
+        return REGEX_IFRAME.search(html.unescape(self.html_content)).group(1)
 
 
 class Client:
