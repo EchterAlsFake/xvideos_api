@@ -17,10 +17,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import json
 import html
+import logging
 
 from bs4 import BeautifulSoup
 from functools import cached_property
 from base_api.base import Core, threaded, default, FFMPEG
+from base_api.modules.download import legacy_download
 from base_api.modules.quality import Quality
 
 try:
@@ -162,7 +164,12 @@ class Video:
         :return:
         """
         quality = Core().fix_quality(quality)
-        Core().download(video=self, quality=quality, path=path, callback=callback, downloader=downloader)
+        try:
+            Core().download(video=self, quality=quality, path=path, callback=callback, downloader=downloader)
+
+        except AttributeError:
+            logging.warning("Video doesn't have an HLS stream. Using legacy downloading instead...")
+            legacy_download(stream=True, path=path, callback=callback, url=self.cdn_url)
 
     @cached_property
     def m3u8_base_url(self) -> str:
@@ -233,6 +240,10 @@ class Video:
     @cached_property
     def embed_url(self) -> str:
         return REGEX_IFRAME.search(html.unescape(self.html_content)).group(1)
+
+    @cached_property
+    def cdn_url(self) -> str:
+        return self.json_data["contentUrl"]
 
 
 class Client:
