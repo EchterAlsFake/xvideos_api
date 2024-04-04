@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import json
 import html
 import logging
+import argparse
 
 from bs4 import BeautifulSoup
 from functools import cached_property
@@ -294,3 +295,35 @@ class Client:
 
         for id in urls:
             yield Video(id)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="API Command Line Interface")
+    parser.add_argument("--download", type=str, help="URL to download from")
+    parser.add_argument("--quality", type=str, help="The video quality (best,half,worst)")
+    parser.add_argument("--file", type=str, help="(Optional) Specify a file with URLs (separated with new lines)")
+    parser.add_argument("--downloader", type=str, help="The downloader for the segments (threaded,ffmpeg,default)")
+    parser.add_argument("--output", type=str, help="The output path (with filename)")
+    args = parser.parse_args()
+
+    if args.download:
+        client = Client()
+        video = client.get_video(args.download)
+        video.download(downloader=args.downloader, quality=args.quality, path=args.output)
+
+    if args.file:
+        videos = []
+        client = Client()
+
+        with open(args.file, "r") as file:
+            content = file.read().splitlines()
+
+        for url in content:
+            videos.append(client.get_video(url))
+
+        for video in videos:
+            video.download(quality=args.quality, downloader=args.downloader, path=args.output)
+
+
+if __name__ == "__main__":
+    main()

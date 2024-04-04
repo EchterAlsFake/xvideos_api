@@ -41,6 +41,8 @@ video_object.download(downloader=threaded, quality=Quality.BEST, path="your_outp
 # SEE DOCUMENTATION FOR MORE
 ```
 
+> [!NOTE]
+> XVideos API can also be used from the command line. Do: xvideos_api -h to see the options
 # Changelog
 See [Changelog](https://github.com/EchterAlsFake/xvideos_api/blob/master/README/Changelog.md) for more details.
 
