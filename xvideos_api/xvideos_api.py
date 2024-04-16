@@ -368,5 +368,6 @@ def main():
             path = Core().return_path(args=args, video=video)
             video.download(quality=args.quality, path=path, downloader=args.downloader)
 
+
 if __name__ == "__main__":
     main()
