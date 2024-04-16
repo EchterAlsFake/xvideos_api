@@ -22,7 +22,7 @@ import argparse
 
 from bs4 import BeautifulSoup
 from functools import cached_property
-from base_api.base import Core, threaded, default, FFMPEG
+from base_api.base import Core, threaded, default, FFMPEG, setup_api
 from base_api.modules.download import legacy_download
 from base_api.modules.quality import Quality
 
@@ -60,7 +60,7 @@ class Video:
             return url
 
         else:
-            raise InvalidUrl
+            raise InvalidUrl("Invalid Video URL")
 
     @classmethod
     def is_desired_script(cls, tag):
@@ -247,6 +247,38 @@ class Video:
         return self.json_data["contentUrl"]
 
 
+class Pornstar:
+    def __init__(self, url):
+        self.url = url
+        base_content = Core().get_content(f"{self.url}/videos/best/0").decode("utf-8")
+        self.data = json.loads(base_content)
+
+    @cached_property
+    def total_videos(self):
+        return int(self.data["nb_videos"])
+
+    @cached_property
+    def per_page(self):
+        return int(self.data["nb_per_page"])
+
+    @cached_property
+    def total_pages(self):
+        return round(self.total_videos / self.per_page)
+
+    @cached_property
+    def videos(self):
+        for idx in range(0, self.total_pages):
+            url_dynamic_javascript = Core().get_content(f"{self.url}/videos/best/{idx}").decode("utf-8")
+            data = json.loads(url_dynamic_javascript)
+
+            u_values = [video["u"] for video in data["videos"]]
+            for video in u_values:
+                url = str(video).split("/")
+                id = url[4]
+                part_two = url[5]
+                yield Video(f"https://www.xvideos.com/video.{id}/{part_two}")
+
+
 class Client:
 
     @classmethod
@@ -296,14 +328,19 @@ class Client:
         for id in urls:
             yield Video(id)
 
+    @classmethod
+    def get_pornstar(self, url):
+        return Pornstar(url)
+
 
 def main():
     parser = argparse.ArgumentParser(description="API Command Line Interface")
     parser.add_argument("--download", type=str, help="URL to download from")
-    parser.add_argument("--quality", type=str, help="The video quality (best,half,worst)")
+    parser.add_argument("--quality", type=str, help="The video quality (best,half,worst)", required=True)
     parser.add_argument("--file", type=str, help="(Optional) Specify a file with URLs (separated with new lines)")
-    parser.add_argument("--downloader", type=str, help="The downloader for the segments (threaded,ffmpeg,default)")
-    parser.add_argument("--output", type=str, help="The output path (with filename)")
+    parser.add_argument("--downloader", type=str, help="The downloader for the segments (threaded,ffmpeg,default)", required=True)
+    parser.add_argument("--output", type=str, help="The output path (with filename)", required=True)
+    parser.add_argument("--add_video_title", type=bool, help="Whether to append the video title to the output path. (True,False)")
     args = parser.parse_args()
 
     if args.download:
@@ -326,4 +363,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    #main()
+
+    client = Client()
+    pornstar = client.get_pornstar("https://de.xvideos.com/pornstars/jasmine-jae2")
+    for video in pornstar.videos:
+        print(video.title)
