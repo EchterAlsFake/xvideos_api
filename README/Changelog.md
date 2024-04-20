@@ -12,4 +12,7 @@
 # 1.2
 - code optimization
 - added embed url to video objects
-- added legacy downloading for low quality videos
+- added legacy downloading for low-quality videos
+
+# 1.3
+- implemented the Pornstar object
