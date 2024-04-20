@@ -19,6 +19,7 @@ The ToS of xvideos.com clearly say that using scrapers / bots isn't allowed.
     - [Attributes](#attributes)
     - [Downloading](#downloading-a-video)
     - [Custom callback](#custom-callback-for-downloading--videos)
+- [The Pornstar object](#the-pornstar-object)
 - [Searching Videos](#searching)
     - [Basic Search](#basic-search)
     - [Using Filters](#using-filters)
@@ -123,6 +124,26 @@ def custom_callback(pos, total):
 ```
 
 When downloading a video, you can specify your callback functions in the `callback` argument
+
+# The Pornstar Object
+```python
+from xvideos_api.xvideos_api import Client
+
+client = Client()
+pornstar = client.get_pornstar("<pornstar_url>")
+
+videos = pornstar.videos
+for video in videos:
+  print(video.title)
+
+
+# Other stuff:
+
+total_pages = pornstar.total_pages
+total_videos = pornstar.total_videos
+
+# I won't implement the user tab. If you really need it, open an Issue about it.
+```
 
 # Searching
 
