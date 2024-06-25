@@ -15,7 +15,7 @@ def video_object_test(object):
 
 
 def test_base_search():
-    videos = client.search(query, pages=1)
+    videos = client.search(query)
     for video in videos:
         assert isinstance(video.title, str) and len(video.title) > 0
 
@@ -37,14 +37,12 @@ def test_Sort_search():
 
 
 def test_SortVideoTime_search():
-    videos = client.search(query, pages=1, sorting_Time=SortVideoTime.Sort_long)
-    videos_2 = client.search(query, pages=1, sorting_Time=SortVideoTime.Sort_all)
-    videos_3 = client.search(query, pages=1, sorting_Time=SortVideoTime.Sort_short)
-    videos_4 = client.search(query, pages=1, sorting_Time=SortVideoTime.Sort_middle)
-    videos_5 = client.search(query, pages=1, sorting_Time=SortVideoTime.Sort_really_long)
-    videos_6 = client.search(query, pages=1, sorting_Time=SortVideoTime.Sort_long_10_20min)
-
-
+    videos = client.search(query, sorting_Time=SortVideoTime.Sort_long)
+    videos_2 = client.search(query, sorting_Time=SortVideoTime.Sort_all)
+    videos_3 = client.search(query, sorting_Time=SortVideoTime.Sort_short)
+    videos_4 = client.search(query, sorting_Time=SortVideoTime.Sort_middle)
+    videos_5 = client.search(query, sorting_Time=SortVideoTime.Sort_really_long)
+    videos_6 = client.search(query, sorting_Time=SortVideoTime.Sort_long_10_20min)
 
     video_object_test(videos)
     video_object_test(videos_2)
@@ -55,9 +53,9 @@ def test_SortVideoTime_search():
 
 
 def test_SortQuality_search():
-    videos = client.search(query, pages=1, sort_Quality=SortQuality.Sort_720p)
-    videos_2 = client.search(query, pages=1, sort_Quality=SortQuality.Sort_all)
-    videos_3 = client.search(query, pages=1, sort_Quality=SortQuality.Sort_1080_plus)
+    videos = client.search(query, sort_Quality=SortQuality.Sort_720p)
+    videos_2 = client.search(query, sort_Quality=SortQuality.Sort_all)
+    videos_3 = client.search(query, sort_Quality=SortQuality.Sort_1080_plus)
 
     video_object_test(videos)
     video_object_test(videos_2)
@@ -65,12 +63,12 @@ def test_SortQuality_search():
 
 
 def test_SortDate_search():
-    videos = client.search(query, pages=1, sorting_Date=SortDate.Sort_all)
-    videos_2 = client.search(query, pages=1, sorting_Date=SortDate.Sort_week)
-    videos_3 = client.search(query, pages=1, sorting_Date=SortDate.Sort_month)
-    videos_4 = client.search(query, pages=1, sorting_Date=SortDate.Sort_last_3_days)
-    videos_5 = client.search(query, pages=1, sorting_Date=SortDate.Sort_last_3_months)
-    videos_6 = client.search(query, pages=1, sorting_Date=SortDate.Sort_last_6_months)
+    videos = client.search(query, sorting_Date=SortDate.Sort_all)
+    videos_2 = client.search(query, sorting_Date=SortDate.Sort_week)
+    videos_3 = client.search(query, sorting_Date=SortDate.Sort_month)
+    videos_4 = client.search(query, sorting_Date=SortDate.Sort_last_3_days)
+    videos_5 = client.search(query, sorting_Date=SortDate.Sort_last_3_months)
+    videos_6 = client.search(query, sorting_Date=SortDate.Sort_last_6_months)
 
     video_object_test(videos)
     video_object_test(videos_2)
