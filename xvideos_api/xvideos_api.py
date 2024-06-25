@@ -20,6 +20,7 @@ import html
 import logging
 import argparse
 
+import requests
 from bs4 import BeautifulSoup
 from functools import cached_property
 from base_api.base import Core, threaded, default, FFMPEG
@@ -308,14 +309,14 @@ class Client:
 
     @classmethod
     def search(cls, query, sorting_Sort: Sort = Sort.Sort_relevance, sorting_Date: SortDate = SortDate.Sort_all,
-               sorting_Time: SortVideoTime = SortVideoTime.Sort_all, sort_Quality: SortQuality = SortQuality.Sort_all,
-               pages=2):
+               sorting_Time: SortVideoTime = SortVideoTime.Sort_all, sort_Quality: SortQuality = SortQuality.Sort_all,):
 
         query = query.replace(" ", "+")
 
         base_url = f"https://www.xvideos.com/?k={query}&sort={sorting_Sort}%&datef={sorting_Date}&durf={sorting_Time}&quality={sort_Quality}"
-        urls = []
-        for page in range(pages):
+        page = 0
+
+        for page in range(100):
             response = Core().get_content(f"{base_url}&p={page}", headers=headers).decode("utf-8")
             urls_ = Client.extract_video_urls(response)
 
@@ -323,10 +324,8 @@ class Client:
                 url = f"https://www.xvideos.com{url}"
 
                 if REGEX_VIDEO_CHECK_URL.match(url):
-                    urls.append(url)
-
-        for id in urls:
-            yield Video(id)
+                    yield Video(url)
+            page += 1
 
     @classmethod
     def get_pornstar(self, url):

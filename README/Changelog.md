@@ -16,3 +16,6 @@
 
 # 1.3
 - implemented the Pornstar object
+
+# 1.4
+- using infinite page generating instead of static one (for Porn Fetch)
