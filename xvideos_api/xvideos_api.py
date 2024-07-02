@@ -20,7 +20,6 @@ import html
 import logging
 import argparse
 
-import requests
 from bs4 import BeautifulSoup
 from functools import cached_property
 from base_api.base import Core, threaded, default, FFMPEG
@@ -108,45 +107,6 @@ class Video:
             else:
                 items.append((new_key, v))
         return dict(items)
-
-    def get_available_qualities(self) -> list:
-        """
-        :return: (list) List of available qualities
-        """
-        response = Core().get_content(self.m3u8_base_url, headers=headers).decode("utf-8")
-        lines = response.splitlines()
-
-        quality_url_map = {}
-        base_qualities = ["250p", "360p", "480p", "720p", "1080p"]
-
-        for line in lines:
-            for quality in base_qualities:
-                if f"hls-{quality}" in line:
-                    quality_url_map[quality] = line
-
-        self.quality_url_map = quality_url_map
-        self.available_qualities = list(quality_url_map.keys())
-        return self.available_qualities
-
-    def get_m3u8_by_quality(self, quality):
-        """
-        :param quality: (str, Quality) The video quality
-        :return: (str) The m3u8 URL for the given quality
-        """
-        quality = Core().fix_quality(quality)
-
-        self.get_available_qualities()
-        base_qualities = ["250p", "360p", "480p", "720p", "1080p"]
-        if quality == Quality.BEST:
-            selected_quality = max(self.available_qualities, key=lambda q: base_qualities.index(q))
-        elif quality == Quality.WORST:
-            selected_quality = min(self.available_qualities, key=lambda q: base_qualities.index(q))
-        elif quality == Quality.HALF:
-            sorted_qualities = sorted(self.available_qualities, key=lambda q: base_qualities.index(q))
-            middle_index = len(sorted_qualities) // 2
-            selected_quality = sorted_qualities[middle_index]
-
-        return self.quality_url_map.get(selected_quality)
 
     def get_segments(self, quality) -> list:
         """
@@ -314,7 +274,6 @@ class Client:
         query = query.replace(" ", "+")
 
         base_url = f"https://www.xvideos.com/?k={query}&sort={sorting_Sort}%&datef={sorting_Date}&durf={sorting_Time}&quality={sort_Quality}"
-        page = 0
 
         for page in range(100):
             response = Core().get_content(f"{base_url}&p={page}", headers=headers).decode("utf-8")
@@ -325,7 +284,6 @@ class Client:
 
                 if REGEX_VIDEO_CHECK_URL.match(url):
                     yield Video(url)
-            page += 1
 
     @classmethod
     def get_pornstar(self, url):
