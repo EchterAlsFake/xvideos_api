@@ -1,4 +1,4 @@
-# XNXX API Documentation
+# xvideos API Documentation
 
 > - Version 1.1
 > - Author: Johannes Habel
