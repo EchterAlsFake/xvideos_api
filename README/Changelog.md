@@ -19,3 +19,6 @@
 
 # 1.4
 - using infinite page generating instead of static one (for Porn Fetch)
+
+# 1.4.1
+- updating to the new eaf_base_api requirements

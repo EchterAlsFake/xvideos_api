@@ -37,6 +37,9 @@ except (ModuleNotFoundError, ImportError):
     from .modules.sorting import *
 
 
+base_qualities = ["250p", "360p", "480p", "720p", "1080p", "1440p", "2160p"]  # Not sure if this is all correct :skull:
+
+
 class Video:
     def __init__(self, url):
         """
@@ -114,7 +117,8 @@ class Video:
         :return: (list) A list of segments (the .ts files)
         """
         quality = Core().fix_quality(quality)
-        segments = Core().get_segments(quality=quality, m3u8_base_url=self.m3u8_base_url)
+        segments = Core().get_segments(quality=quality, m3u8_base_url=self.m3u8_base_url, base_qualities=base_qualities,
+                                       seperator="-")
         return segments
 
     def download(self, downloader, quality, path, callback=None):
