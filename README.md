@@ -23,8 +23,7 @@ XVideos API is an API for xvideos.com. It allows you to fetch information from v
 
 
 ```python
-from xvideos_api.xvideos_api import Client, Quality
-from base_api.modules.download import threaded, default, FFMPEG
+from xvideos_api import Client, Quality, threaded, default, FFMPEG
 # Initialize a Client object
 client = Client()
 

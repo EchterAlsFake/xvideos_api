@@ -25,6 +25,7 @@ from functools import cached_property
 from base_api.base import Core, threaded, default, FFMPEG
 from base_api.modules.download import legacy_download
 from base_api.modules.quality import Quality
+from base_api.modules.download import Callback
 
 try:
     from modules.consts import *

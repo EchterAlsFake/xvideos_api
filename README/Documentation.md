@@ -2,7 +2,7 @@
 
 > - Version 1.1
 > - Author: Johannes Habel
-> - Copryight (C) 2024
+> - Copyright (C) 2024
 > - License: LGPLv3
 > - Dependencies: requests, lxml, bs4, ffmpeg-progress-yield, eaf_base_api
 > - Optional dependency: ffmpeg (installed in your path)
@@ -32,8 +32,7 @@ The ToS of xvideos.com clearly say that using scrapers / bots isn't allowed.
 #### To import all modules, you should use the following:
 
 ```python
-from xvideos_api.xvideos_api import Client, Quality
-from base_api.modules.download import threaded, default, FFMPEG
+from xvideos_api import Client, Quality, threaded, default, FFMPEG
 ```
 
 # Initializing the Client
@@ -41,7 +40,7 @@ from base_api.modules.download import threaded, default, FFMPEG
 - The Client is needed for all basic operations and will be used to handle everything.
 
 ```python
-from xvideos_api.xvideos_api import Client
+from xvideos_api import Client
 
 client = Client()
 
@@ -92,9 +91,7 @@ When downloading a video, you can give a `downloader` argument which represents 
 You can import the three downloaders using:
 
 ```python
-from base_api.modules.download import FFMPEG, threaded, default
-from xvideos_api.xvideos_api import Client, Quality
-from base_api.modules.progress_bars import Callback
+from xvideos_api import Client, Quality, Callback, threaded, default, FFMPEG
 
 client = Client()
 video = client.get_video("...")
@@ -127,7 +124,7 @@ When downloading a video, you can specify your callback functions in the `callba
 
 # The Pornstar Object
 ```python
-from xvideos_api.xvideos_api import Client
+from xvideos_api import Client
 
 client = Client()
 pornstar = client.get_pornstar("<pornstar_url>")
@@ -150,10 +147,10 @@ total_videos = pornstar.total_videos
 ## Basic Search
 
 ```python
-from xvideos_api.xvideos_api import Client
+from xvideos_api import Client
 
 client = Client()
-videos = client.search("Mia Khalifa", pages=2)
+videos = client.search("Mia Khalifa")
 
 for video in videos:
   print(video.title)
@@ -165,14 +162,14 @@ for video in videos:
 ## Using Filters
 
 ```python
-from xvideos_api.modules.sorting import SortDate, Sort, SortQuality, SortVideoTime
+from xvideos_api import sorting
 from xvideos_api.xvideos_api import Client
 
 client = Client()
-videos = Client.search("Mia Khalifa", pages=1, sorting_Date=SortDate.Sort_all, sort_Quality=SortQuality.Sort_720p,
-                        sorting_Sort=Sort.Sort_relevance, sorting_Time=SortVideoTime.Sort_short)
+videos = Client.search("Mia Khalifa", sorting_Date=sorting.SortDate.Sort_all, sort_Quality=sorting.SortQuality.Sort_720p,
+                        sorting_Sort=sorting.Sort.Sort_relevance, sorting_Time=sorting.SortVideoTime.Sort_short)
 
-# If you don't specify filters, the default from xvideos.com will be used!
+# If you don't specify filters,  defaults from xvideos.com will be used!
 ```
 
 - Sort: Sorts videos by relevance, views and stuff
@@ -188,7 +185,7 @@ videos = Client.search("Mia Khalifa", pages=1, sorting_Date=SortDate.Sort_all, s
 First: Import the Quality object:
 
 ```python
-from base_api.base import Quality
+from xvideos_api import Quality
 ```
 
 There are three quality types:
