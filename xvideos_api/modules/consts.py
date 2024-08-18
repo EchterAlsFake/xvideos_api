@@ -16,3 +16,7 @@ REGEX_VIDEO_PORNSTARS = re.compile(r'a href="/models/(.*?)" class=')
 REGEX_IFRAME = re.compile(r'video-embed" type="text" readonly value="(.*?)" class="form-control"')
 
 REGEX_SEARCH_SCRAPE_VIDEOS = re.compile(r'none;"><a href="(.*?)">', re.DOTALL)
+
+REGEX_USER_SUBSCRIBER_COUNT = re.compile(r'><span class="count">(.*?)</span>')
+REGEX_USER_BLACKBOX_URL = re.compile(r'<a href="/(.*?) class="btn btn-default label ')
+REGEX_USER_IS_CHANNEL = re.compile(r'id="pinfo-age"')

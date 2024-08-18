@@ -19,6 +19,7 @@ import json
 import html
 import logging
 import argparse
+from copyreg import constructor
 
 from bs4 import BeautifulSoup
 from functools import cached_property
@@ -26,6 +27,7 @@ from base_api.base import Core, threaded, default, FFMPEG
 from base_api.modules.download import legacy_download
 from base_api.modules.quality import Quality
 from base_api.modules.download import Callback
+from urllib3 import request
 
 try:
     from modules.consts import *
@@ -39,6 +41,29 @@ except (ModuleNotFoundError, ImportError):
 
 
 base_qualities = ["250p", "360p", "480p", "720p", "1080p", "1440p", "2160p"]  # Not sure if this is all correct :skull:
+
+class User:
+    def __init__(self, content):
+        self.content = content
+        blackbox_url = f"https://xvideos.com/{REGEX_USER_BLACKBOX_URL.search(self.content).group(1)}#_tabAboutMe".replace('"', "")
+        self.bb_content = Core().get_content(blackbox_url).decode("utf-8")
+        is_channel_check = REGEX_USER_IS_CHANNEL.fullmatch(self.bb_content)
+        print(self.bb_content)
+        if is_channel_check:
+            self.is_channel = True
+
+        else:
+            self.is_channel = False
+
+
+    @cached_property
+    def pornstar(self):
+        ""
+
+    @cached_property
+    def channel(self):
+        ""
+
 
 
 class Video:
@@ -211,6 +236,10 @@ class Video:
     @cached_property
     def cdn_url(self) -> str:
         return self.json_data["contentUrl"]
+
+    @cached_property
+    def user(self):
+        return User(self.html_content)
 
 
 class Pornstar:
