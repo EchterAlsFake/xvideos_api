@@ -51,6 +51,10 @@ def test_thumbnail_url():
     assert isinstance(video.thumbnail_url, str) and len(video.thumbnail_url) > 0
 
 
+def test_preview_video_url():
+    assert isinstance(video.preview_video_url, str) and len(video.preview_video_url) > 0
+
+
 def test_publish_date():
     assert isinstance(video.publish_date, str) and len(video.publish_date) > 0
 

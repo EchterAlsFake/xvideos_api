@@ -180,6 +180,14 @@ class Video:
         return html.unescape(self.json_data["thumbnailUrl"])[0]
 
     @cached_property
+    def preview_video_url(self) -> str:
+        thumb = html.unescape(self.json_data["thumbnailUrl"])[0]
+        base_url = re.sub(r'/thumbs(169)?(xnxx)?(l*|poster)/', '/videopreview/', thumb[:url.rfind("/")])
+        suffix = re.search(r'-(\d+)', base_url)
+        base_url = re.sub(r'-(\d+)', '', base_url) if suffix else base_url
+        return f"{base_url}_169{suffix.group(0) if suffix else ''}.mp4"
+
+    @cached_property
     def publish_date(self) -> str:
         return html.unescape(self.json_data["uploadDate"])
 
