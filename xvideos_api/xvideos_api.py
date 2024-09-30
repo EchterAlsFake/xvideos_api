@@ -19,7 +19,7 @@ import json
 import html
 import logging
 import argparse
-from copyreg import constructor
+import os
 
 from bs4 import BeautifulSoup
 from functools import cached_property
@@ -27,7 +27,6 @@ from base_api.base import Core, threaded, default, FFMPEG
 from base_api.modules.download import legacy_download
 from base_api.modules.quality import Quality
 from base_api.modules.download import Callback
-from urllib3 import request
 
 try:
     from modules.consts import *
@@ -147,7 +146,7 @@ class Video:
                                        seperator="-")
         return segments
 
-    def download(self, downloader, quality, path, callback=None):
+    def download(self, downloader, quality, path, callback=None, no_title=False):
         """
         :param callback:
         :param downloader:
@@ -156,6 +155,10 @@ class Video:
         :return:
         """
         quality = Core().fix_quality(quality)
+
+        if no_title is False:
+            path = f"{path}{os.sep}{self.title}.mp4"
+
         try:
             Core().download(video=self, quality=quality, path=path, callback=callback, downloader=downloader)
 
