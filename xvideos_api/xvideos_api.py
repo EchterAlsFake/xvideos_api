@@ -20,6 +20,7 @@ import html
 import logging
 import argparse
 import os
+import math
 
 from bs4 import BeautifulSoup
 from functools import cached_property
@@ -269,7 +270,7 @@ class Pornstar:
 
     @cached_property
     def total_pages(self):
-        return round(self.total_videos / self.per_page)
+        return math.ceil(self.total_videos / self.per_page)
 
     @cached_property
     def videos(self):
