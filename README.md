@@ -17,7 +17,7 @@ XVideos API is an API for xvideos.com. It allows you to fetch information from v
 
 # Quickstart
 
-### Have a look at the [Documentation](https://github.com/EchterAlsFake/xvideos_api/blob/master/README/Documentation.md) for more details
+### Have a look at the [Documentation](https://github.com/EchterAlsFake/API_Docs/blob/master/Porn_APIs/XVideos.md) for more details
 
 - Install the library with `pip install xvideos_api`
 
