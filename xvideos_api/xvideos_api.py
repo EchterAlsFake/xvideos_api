@@ -14,8 +14,8 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-
-import json
+from re import search
+import json5
 import html
 import logging
 import argparse
@@ -47,22 +47,24 @@ class User:
         self.content = content
         blackbox_url = f"https://xvideos.com/{REGEX_USER_BLACKBOX_URL.search(self.content).group(1)}#_tabAboutMe".replace('"', "")
         self.bb_content = Core().get_content(blackbox_url).decode("utf-8")
-        is_channel_check = REGEX_USER_IS_CHANNEL.fullmatch(self.bb_content)
-        print(self.bb_content)
-        if is_channel_check:
-            self.is_channel = True
+        self.soup = BeautifulSoup(self.bb_content, "lxml")
+        content = self.soup.head.find('script').text
+        channel_pattern = r'"channel"\s*:\s*(true|1)|"is_channel"\s*:\s*(true|1)'
+        self.search = re.search(channel_pattern, content, re.IGNORECASE)
 
-        else:
-            self.is_channel = False
 
 
     @cached_property
     def pornstar(self):
-        ""
+        return self.search.group()
+
+    @cached_property
+    def is_channel(self):
+        return self.is_channel
 
     @cached_property
     def channel(self):
-        ""
+        return
 
 
 
@@ -114,7 +116,7 @@ class Video:
 
         for script in script_tags:
             json_text = script.string.strip()
-            data = json.loads(json_text)
+            data = json5.loads(json_text)
             combined_data.update(data)
         cleaned_dictionary = self.flatten_json(combined_data)
         return cleaned_dictionary
@@ -258,7 +260,7 @@ class Pornstar:
     def __init__(self, url):
         self.url = url
         base_content = Core().get_content(f"{self.url}/videos/best/0").decode("utf-8")
-        self.data = json.loads(base_content)
+        self.data = json5.loads(base_content)
 
     @cached_property
     def total_videos(self):
@@ -276,7 +278,7 @@ class Pornstar:
     def videos(self):
         for idx in range(0, self.total_pages):
             url_dynamic_javascript = Core().get_content(f"{self.url}/videos/best/{idx}").decode("utf-8")
-            data = json.loads(url_dynamic_javascript)
+            data = json5.loads(url_dynamic_javascript)
 
             u_values = [video["u"] for video in data["videos"]]
             for video in u_values:
