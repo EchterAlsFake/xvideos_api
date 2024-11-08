@@ -5,7 +5,7 @@ setup(
     version="1.4.2",
     packages=find_packages(),
     install_requires=[
-        "requests", "bs4", "lxml", "ffmpeg-progress-yield", "eaf_base_api"
+        "requests", "bs4", "lxml", "ffmpeg-progress-yield", "eaf_base_api", "json5"
     ],
     entry_points={
         'console_scripts': ['xvideos_api=xvideos_api.xvideos_api:main'
