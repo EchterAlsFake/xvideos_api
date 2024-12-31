@@ -14,20 +14,18 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-from re import search
-import json5
-import html
-import logging
-import argparse
 import os
 import math
+import html
+import json
+import logging
+import requests
+import argparse
 
+from typing import Union
 from bs4 import BeautifulSoup
+from base_api.base import BaseCore
 from functools import cached_property
-from base_api.base import Core, threaded, default, FFMPEG
-from base_api.modules.download import legacy_download
-from base_api.modules.quality import Quality
-from base_api.modules.download import Callback
 
 try:
     from modules.consts import *
@@ -39,19 +37,24 @@ except (ModuleNotFoundError, ImportError):
     from .modules.exceptions import *
     from .modules.sorting import *
 
+core = BaseCore()
+logging.basicConfig(format='%(name)s %(levelname)s %(asctime)s %(message)s', datefmt='%I:%M:%S %p')
+logger = logging.getLogger("HQPORNER API")
+logger.setLevel(logging.DEBUG)
 
-base_qualities = ["250p", "360p", "480p", "720p", "1080p", "1440p", "2160p"]  # Not sure if this is all correct :skull:
+def disable_logging():
+    logger.setLevel(logging.CRITICAL)
+
 
 class User:
     def __init__(self, content):
         self.content = content
         blackbox_url = f"https://xvideos.com/{REGEX_USER_BLACKBOX_URL.search(self.content).group(1)}#_tabAboutMe".replace('"', "")
-        self.bb_content = Core().get_content(blackbox_url).decode("utf-8")
+        self.bb_content = core.fetch(blackbox_url)
         self.soup = BeautifulSoup(self.bb_content, "lxml")
         content = self.soup.head.find('script').text
         channel_pattern = r'"channel"\s*:\s*(true|1)|"is_channel"\s*:\s*(true|1)'
         self.search = re.search(channel_pattern, content, re.IGNORECASE)
-
 
 
     @cached_property
@@ -75,6 +78,11 @@ class Video:
         """
         self.url = self.check_url(url)
         self.html_content = self.get_html_content()
+
+        if isinstance(self.html_content, requests.Response):
+            if self.html_content.status_code == 404:
+                raise VideoUnavailable("The video is not available or the URL is incorrect.")
+
         self.json_data = self.flatten_json(nested_json=self.extract_json_from_html())
         self.script_content = self.get_script_content()
         self.quality_url_map = None
@@ -91,7 +99,7 @@ class Video:
             return url
 
         else:
-            raise InvalidUrl("Invalid Video URL")
+            raise InvalidUrl(f"Invalid Video URL: {url}")
 
     @classmethod
     def is_desired_script(cls, tag):
@@ -105,8 +113,8 @@ class Video:
         target_script = soup.find(self.is_desired_script)
         return target_script.text
 
-    def get_html_content(self):
-        return Core().get_content(self.url, headers=headers).decode("utf-8")
+    def get_html_content(self) -> Union[str, requests.Response]:
+        return core.fetch(self.url)
 
     def extract_json_from_html(self):
         soup = BeautifulSoup(self.html_content, 'lxml')
@@ -116,7 +124,7 @@ class Video:
 
         for script in script_tags:
             json_text = script.string.strip()
-            data = json5.loads(json_text)
+            data = json.loads(json_text)
             combined_data.update(data)
         cleaned_dictionary = self.flatten_json(combined_data)
         return cleaned_dictionary
@@ -144,30 +152,29 @@ class Video:
         :param quality: (str, Quality) The video quality
         :return: (list) A list of segments (the .ts files)
         """
-        quality = Core().fix_quality(quality)
-        segments = Core().get_segments(quality=quality, m3u8_base_url=self.m3u8_base_url, base_qualities=base_qualities,
-                                       seperator="-")
+        segments = core.get_segments(quality=quality, m3u8_url_master=self.m3u8_base_url)
         return segments
 
-    def download(self, downloader, quality, path, callback=None, no_title=False):
+    def download(self, downloader, quality, path="./", callback=None, no_title=False) -> bool:
         """
         :param callback:
         :param downloader:
         :param quality:
         :param path:
+        :param no_title:
         :return:
         """
-        quality = Core().fix_quality(quality)
-
         if no_title is False:
             path = f"{path}{os.sep}{self.title}.mp4"
 
         try:
-            Core().download(video=self, quality=quality, path=path, callback=callback, downloader=downloader)
+            core.download(video=self, quality=quality, path=path, callback=callback, downloader=downloader)
+            return True
 
         except AttributeError:
             logging.warning("Video doesn't have an HLS stream. Using legacy downloading instead...")
-            legacy_download(stream=True, path=path, callback=callback, url=self.cdn_url)
+            core.legacy_download(stream=True, path=path, callback=callback, url=self.cdn_url)
+            return True
 
     @cached_property
     def m3u8_base_url(self) -> str:
@@ -252,15 +259,15 @@ class Video:
         return self.json_data["contentUrl"]
 
     @cached_property
-    def user(self):
+    def user(self) -> User:
         return User(self.html_content)
 
 
 class Pornstar:
     def __init__(self, url):
         self.url = url
-        base_content = Core().get_content(f"{self.url}/videos/best/0").decode("utf-8")
-        self.data = json5.loads(base_content)
+        base_content = core.fetch(f"{self.url}/videos/best/0")
+        self.data = json.loads(base_content)
 
     @cached_property
     def total_videos(self):
@@ -277,13 +284,16 @@ class Pornstar:
     @cached_property
     def videos(self):
         for idx in range(0, self.total_pages):
-            url_dynamic_javascript = Core().get_content(f"{self.url}/videos/best/{idx}").decode("utf-8")
-            data = json5.loads(url_dynamic_javascript)
+            url_dynamic_javascript = core.fetch(f"{self.url}/videos/best/{idx}")
+            data = json.loads(url_dynamic_javascript)
 
             u_values = [video["u"] for video in data["videos"]]
             for video in u_values:
+                print(f"URL: {video}")
                 url = str(video).split("/")
+                print(f"URL 1: {url}")
                 id = url[4]
+                print(f"ID: {id}")
                 part_two = url[5]
                 yield Video(f"https://www.xvideos.com/video.{id}/{part_two}")
 
@@ -291,7 +301,7 @@ class Pornstar:
 class Client:
 
     @classmethod
-    def get_video(cls, url):
+    def get_video(cls, url: str) -> Video:
         """
         :param url: (str) The video URL
         :return: (Video) The video object
@@ -299,7 +309,7 @@ class Client:
         return Video(url)
 
     @classmethod
-    def extract_video_urls(cls, html_content):
+    def extract_video_urls(cls, html_content: str) -> list:
         # Parse the HTML content with BeautifulSoup
         soup = BeautifulSoup(html_content, 'lxml')
         video_urls = []
@@ -316,15 +326,17 @@ class Client:
         return video_urls
 
     @classmethod
-    def search(cls, query, sorting_Sort: Sort = Sort.Sort_relevance, sorting_Date: SortDate = SortDate.Sort_all,
-               sorting_Time: SortVideoTime = SortVideoTime.Sort_all, sort_Quality: SortQuality = SortQuality.Sort_all,):
+    def search(cls, query: str, sorting_sort: Sort = Union[str, Sort.Sort_relevance],
+               sorting_date: Union[str, SortDate] = SortDate.Sort_all,
+               sorting_time: Union[str, SortVideoTime] = SortVideoTime.Sort_all,
+               sort_quality: Union[str, SortQuality] = SortQuality.Sort_all) -> Video:
 
         query = query.replace(" ", "+")
 
-        base_url = f"https://www.xvideos.com/?k={query}&sort={sorting_Sort}%&datef={sorting_Date}&durf={sorting_Time}&quality={sort_Quality}"
+        base_url = f"https://www.xvideos.com/?k={query}&sort={sorting_sort}%&datef={sorting_date}&durf={sorting_time}&quality={sort_quality}"
 
         for page in range(100):
-            response = Core().get_content(f"{base_url}&p={page}", headers=headers).decode("utf-8")
+            response = core.fetch(f"{base_url}&p={page}")
             urls_ = Client.extract_video_urls(response)
 
             for url in urls_:
@@ -334,7 +346,7 @@ class Client:
                     yield Video(url)
 
     @classmethod
-    def get_pornstar(self, url):
+    def get_pornstar(cls, url) -> Pornstar:
         return Pornstar(url)
 
 
@@ -356,7 +368,7 @@ def main():
     if args.download:
         client = Client()
         video = client.get_video(args.download)
-        path = Core().return_path(args=args, video=video)
+        path = BaseCore.return_path(args=args, video=video)
         video.download(quality=args.quality, path=path, downloader=args.downloader)
 
     if args.file:
@@ -370,7 +382,7 @@ def main():
             videos.append(client.get_video(url))
 
         for video in videos:
-            path = Core().return_path(args=args, video=video)
+            path = core.return_path(args=args, video=video)
             video.download(quality=args.quality, path=path, downloader=args.downloader)
 
 

@@ -2,10 +2,10 @@ from setuptools import setup, find_packages
 
 setup(
     name="xvideos_api",
-    version="1.4.2",
+    version="1.5.0",
     packages=find_packages(),
     install_requires=[
-        "requests", "bs4", "lxml", "ffmpeg-progress-yield", "eaf_base_api", "json5"
+        "requests", "bs4", "lxml", "ffmpeg-progress-yield", "eaf_base_api"
     ],
     entry_points={
         'console_scripts': ['xvideos_api=xvideos_api.xvideos_api:main'

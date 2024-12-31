@@ -1,4 +1,0 @@
-bs4
-lxml
-git+https://github.com/EchterAlsFake/eaf_base_api
-json5

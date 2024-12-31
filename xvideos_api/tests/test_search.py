@@ -1,84 +1,75 @@
-from ..xvideos_api import Client, Sort, SortVideoTime, SortQuality, SortDate
+from ..xvideos_api import Client, Sort, SortVideoTime, SortQuality, SortDate, VideoUnavailable
+import pytest
 
-# This is a deep test for the searching functionalities...
-
+# Initialize client and query
 client = Client()
 query = "Mia Khalifa"
 
+def validate_video_objects(videos):
+    """Helper function to validate video objects."""
+    for idx, video in enumerate(videos):
+        try:
+            print(video.title)
+            assert isinstance(video.title, str) and len(video.title) > 0, f"Invalid video title at index {idx}."
+            if idx == 3:  # Validate up to 4 videos for brevity
+                break
 
-def video_object_test(object):
-    for idx, video in enumerate(object):
-        assert isinstance(video.title, str) and len(video.title) > 0
+        except VideoUnavailable:
+            break # Expected
 
-        if idx == 3:
-            break
 
+@pytest.mark.parametrize("sort_option", [
+    Sort.Sort_rating,
+    Sort.Sort_relevance,
+    Sort.Sort_views,
+    Sort.Sort_length,
+    Sort.Sort_random,
+    Sort.Sort_upload_date,
+])
+def test_sort_search(sort_option):
+    """Test sorting by different Sort options."""
+    videos = client.search(query, sorting_sort=sort_option)
+    validate_video_objects(videos)
+
+@pytest.mark.parametrize("time_option", [
+    SortVideoTime.Sort_long,
+    SortVideoTime.Sort_all,
+    SortVideoTime.Sort_short,
+    SortVideoTime.Sort_middle,
+    SortVideoTime.Sort_really_long,
+    SortVideoTime.Sort_long_10_20min,
+])
+def test_sort_video_time_search(time_option):
+    """Test sorting by different SortVideoTime options."""
+    videos = client.search(query, sorting_time=time_option)
+    validate_video_objects(videos)
+
+@pytest.mark.parametrize("quality_option", [
+    SortQuality.Sort_720p,
+    SortQuality.Sort_all,
+    SortQuality.Sort_1080_plus,
+])
+def test_sort_quality_search(quality_option):
+    """Test sorting by different SortQuality options."""
+    videos = client.search(query, sort_quality=quality_option)
+    validate_video_objects(videos)
+
+@pytest.mark.parametrize("date_option", [
+    SortDate.Sort_all,
+    SortDate.Sort_week,
+    SortDate.Sort_month,
+    SortDate.Sort_last_3_days,
+    SortDate.Sort_last_3_months,
+    SortDate.Sort_last_6_months,
+])
+def test_sort_date_search(date_option):
+    """Test sorting by different SortDate options."""
+    videos = client.search(query, sorting_date=date_option)
+    validate_video_objects(videos)
 
 def test_base_search():
+    """Test basic search functionality."""
     videos = client.search(query)
-    for video in videos:
-        assert isinstance(video.title, str) and len(video.title) > 0
+    validate_video_objects(videos)
 
-
-def test_Sort_search():
-    videos = client.search(query, sorting_Sort=Sort.Sort_rating)
-    videos_2 = client.search(query, sorting_Sort=Sort.Sort_relevance)
-    videos_3 = client.search(query, sorting_Sort=Sort.Sort_views)
-    videos_4 = client.search(query, sorting_Sort=Sort.Sort_length)
-    videos_5 = client.search(query, sorting_Sort=Sort.Sort_random)
-    videos_6 = client.search(query, sorting_Sort=Sort.Sort_upload_date)
-
-    video_object_test(videos)
-    video_object_test(videos_2)
-    video_object_test(videos_3)
-    video_object_test(videos_4)
-    video_object_test(videos_5)
-    video_object_test(videos_6)
-
-
-def test_SortVideoTime_search():
-    videos = client.search(query, sorting_Time=SortVideoTime.Sort_long)
-    videos_2 = client.search(query, sorting_Time=SortVideoTime.Sort_all)
-    videos_3 = client.search(query, sorting_Time=SortVideoTime.Sort_short)
-    videos_4 = client.search(query, sorting_Time=SortVideoTime.Sort_middle)
-    videos_5 = client.search(query, sorting_Time=SortVideoTime.Sort_really_long)
-    videos_6 = client.search(query, sorting_Time=SortVideoTime.Sort_long_10_20min)
-
-    video_object_test(videos)
-    video_object_test(videos_2)
-    video_object_test(videos_3)
-    video_object_test(videos_4)
-    video_object_test(videos_5)
-    video_object_test(videos_6)
-
-
-def test_SortQuality_search():
-    videos = client.search(query, sort_Quality=SortQuality.Sort_720p)
-    videos_2 = client.search(query, sort_Quality=SortQuality.Sort_all)
-    videos_3 = client.search(query, sort_Quality=SortQuality.Sort_1080_plus)
-
-    video_object_test(videos)
-    video_object_test(videos_2)
-    video_object_test(videos_3)
-
-
-def test_SortDate_search():
-    videos = client.search(query, sorting_Date=SortDate.Sort_all)
-    videos_2 = client.search(query, sorting_Date=SortDate.Sort_week)
-    videos_3 = client.search(query, sorting_Date=SortDate.Sort_month)
-    videos_4 = client.search(query, sorting_Date=SortDate.Sort_last_3_days)
-    videos_5 = client.search(query, sorting_Date=SortDate.Sort_last_3_months)
-    videos_6 = client.search(query, sorting_Date=SortDate.Sort_last_6_months)
-
-    video_object_test(videos)
-    video_object_test(videos_2)
-    video_object_test(videos_3)
-    video_object_test(videos_4)
-    video_object_test(videos_5)
-    video_object_test(videos_6)
-
-
-
-
-
-
+# Refactored by ChatGPT lol
