@@ -22,3 +22,9 @@
 
 # 1.4.1
 - updating to the new eaf_base_api requirements
+
+# 1.5
+- removed json5 requirement
+- fixed tests
+- added VideoUnavailable exception
+- code refactoring and type hinting
