@@ -39,7 +39,7 @@ except (ModuleNotFoundError, ImportError):
 
 core = BaseCore()
 logging.basicConfig(format='%(name)s %(levelname)s %(asctime)s %(message)s', datefmt='%I:%M:%S %p')
-logger = logging.getLogger("HQPORNER API")
+logger = logging.getLogger("XVIDEOS API")
 logger.setLevel(logging.DEBUG)
 
 def disable_logging():
