@@ -28,3 +28,7 @@
 - fixed tests
 - added VideoUnavailable exception
 - code refactoring and type hinting
+
+# 1.5.1
+- switched to httpx
+- removed lxml and requests from project dependencies
