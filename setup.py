@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="xvideos_api",
+    name="xvideos_api-async",
     version="1.5.2",
     packages=find_packages(),
     install_requires=["bs4", "eaf_base_api-async"],

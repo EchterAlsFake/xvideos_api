@@ -26,6 +26,7 @@ import argparse
 from bs4 import BeautifulSoup
 from typing import Union, List
 from base_api.base import BaseCore
+from base_api import base
 from functools import cached_property
 
 try:
@@ -48,6 +49,9 @@ def disable_logging():
 
 
 class Video:
+    MAX_RETRIES = 5  # Set the maximum number of retries
+    RETRY_DELAY = 2  # Set the delay between retries in seconds
+
     def __init__(self, url, content):
         """
         :param url: (str) The URL of the video
@@ -66,8 +70,19 @@ class Video:
 
     @classmethod
     async def create(cls, url):
-        content = await core.fetch(url)
-        return cls(url, content)
+        retries = 0
+        while retries < cls.MAX_RETRIES:
+            content = await core.fetch(url, get_response=True)
+            if content.status_code != 200:
+                logger.critical(content.status_code)
+            content = content.text
+            if not "<h1>Network error" in content:  # Check if the content is valid
+                return cls(url, content)
+
+            retries += 1
+            await asyncio.sleep(cls.RETRY_DELAY)  # Non-blocking delay
+
+        raise Exception(f"Failed to fetch content from {url} after {cls.MAX_RETRIES} retries")
 
     @classmethod
     def is_desired_script(cls, tag):
