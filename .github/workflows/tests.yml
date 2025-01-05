@@ -3,11 +3,11 @@ name: async API test
 on:
   push:
     branches:
-      - main
+      - master
       - async
   pull_request:
     branches:
-      - main
+      - master
       - async
   schedule:
     - cron: '0 0 * * 0' # Runs every Sunday at 00:00 UTC
