@@ -2,9 +2,9 @@ from setuptools import setup, find_packages
 
 setup(
     name="xvideos_api",
-    version="1.5.1",
+    version="1.5.2",
     packages=find_packages(),
-    install_requires=["bs4", "eaf_base_api"],
+    install_requires=["bs4", "eaf_base_api", "httpx"],
     entry_points={
         'console_scripts': ['xvideos_api=xvideos_api.xvideos_api:main'
             # If you want to create any executable scripts

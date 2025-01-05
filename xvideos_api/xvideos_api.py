@@ -46,30 +46,6 @@ def disable_logging():
     logger.setLevel(logging.CRITICAL)
 
 
-class User:
-    def __init__(self, content):
-        self.content = content
-        blackbox_url = f"https://xvideos.com/{REGEX_USER_BLACKBOX_URL.search(self.content).group(1)}#_tabAboutMe".replace('"', "")
-        self.bb_content = core.fetch(blackbox_url)
-        self.soup = BeautifulSoup(self.bb_content)
-        content = self.soup.head.find('script').text
-        channel_pattern = r'"channel"\s*:\s*(true|1)|"is_channel"\s*:\s*(true|1)'
-        self.search = re.search(channel_pattern, content, re.IGNORECASE)
-
-
-    @cached_property
-    def pornstar(self):
-        return self.search.group()
-
-    @cached_property
-    def is_channel(self):
-        return self.is_channel
-
-    @cached_property
-    def channel(self):
-        return
-
-
 
 class Video:
     def __init__(self, url):
@@ -109,7 +85,7 @@ class Video:
         return all(content in tag.text for content in script_contents)
 
     def get_script_content(self):
-        soup = BeautifulSoup(self.html_content)
+        soup = BeautifulSoup(self.html_content, features="html.parser")
         target_script = soup.find(self.is_desired_script)
         return target_script.text
 
@@ -117,7 +93,7 @@ class Video:
         return core.fetch(self.url)
 
     def extract_json_from_html(self):
-        soup = BeautifulSoup(self.html_content)
+        soup = BeautifulSoup(self.html_content, features="html.parser")
         script_tags = soup.find_all('script', {'type': 'application/ld+json'})
 
         combined_data = {}
@@ -258,10 +234,6 @@ class Video:
     def cdn_url(self) -> str:
         return self.json_data["contentUrl"]
 
-    @cached_property
-    def user(self) -> User:
-        return User(self.html_content)
-
 
 class Pornstar:
     def __init__(self, url):
@@ -308,7 +280,7 @@ class Client:
     @classmethod
     def extract_video_urls(cls, html_content: str) -> list:
         # Parse the HTML content with BeautifulSoup
-        soup = BeautifulSoup(html_content)
+        soup = BeautifulSoup(html_content, features="html.parser")
         video_urls = []
 
         # Find all 'div' elements with the class 'thumb'
