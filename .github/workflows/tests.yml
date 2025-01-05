@@ -1,8 +1,14 @@
-name: xvideos API test
+name: Sync API test
 
 on:
   push:
+    branches:
+      - main
+      - async
   pull_request:
+    branches:
+      - main
+      - async
   schedule:
     - cron: '0 0 * * 0' # Runs every Sunday at 00:00 UTC
 jobs:
@@ -19,7 +25,8 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pytest requests ffmpeg-progress-yield bs4 lxml git+https://github.com/EchterAlsFake/eaf_base_api json5
+        pip install pytest
+        pip install .
     - name: Test with pytest
       run: |
         pytest
