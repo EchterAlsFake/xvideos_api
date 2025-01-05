@@ -18,8 +18,8 @@ import os
 import math
 import html
 import json
+import httpx
 import logging
-import requests
 import argparse
 
 from typing import Union
@@ -79,7 +79,7 @@ class Video:
         self.url = self.check_url(url)
         self.html_content = self.get_html_content()
 
-        if isinstance(self.html_content, requests.Response):
+        if isinstance(self.html_content, httpx.Response):
             if self.html_content.status_code == 404:
                 raise VideoUnavailable("The video is not available or the URL is incorrect.")
 
@@ -113,7 +113,7 @@ class Video:
         target_script = soup.find(self.is_desired_script)
         return target_script.text
 
-    def get_html_content(self) -> Union[str, requests.Response]:
+    def get_html_content(self) -> Union[str, httpx.Response]:
         return core.fetch(self.url)
 
     def extract_json_from_html(self):
@@ -173,7 +173,7 @@ class Video:
 
         except AttributeError:
             logging.warning("Video doesn't have an HLS stream. Using legacy downloading instead...")
-            core.legacy_download(stream=True, path=path, callback=callback, url=self.cdn_url)
+            core.legacy_download(path=path, callback=callback, url=self.cdn_url)
             return True
 
     @cached_property
@@ -289,11 +289,8 @@ class Pornstar:
 
             u_values = [video["u"] for video in data["videos"]]
             for video in u_values:
-                print(f"URL: {video}")
                 url = str(video).split("/")
-                print(f"URL 1: {url}")
                 id = url[4]
-                print(f"ID: {id}")
                 part_two = url[5]
                 yield Video(f"https://www.xvideos.com/video.{id}/{part_two}")
 
