@@ -14,16 +14,17 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+import asyncio
 import os
 import math
 import html
 import json
+import httpx
 import logging
-import requests
 import argparse
 
-from typing import Union
 from bs4 import BeautifulSoup
+from typing import Union, List
 from base_api.base import BaseCore
 from functools import cached_property
 
@@ -46,40 +47,15 @@ def disable_logging():
     logger.setLevel(logging.CRITICAL)
 
 
-class User:
-    def __init__(self, content):
-        self.content = content
-        blackbox_url = f"https://xvideos.com/{REGEX_USER_BLACKBOX_URL.search(self.content).group(1)}#_tabAboutMe".replace('"', "")
-        self.bb_content = core.fetch(blackbox_url)
-        self.soup = BeautifulSoup(self.bb_content)
-        content = self.soup.head.find('script').text
-        channel_pattern = r'"channel"\s*:\s*(true|1)|"is_channel"\s*:\s*(true|1)'
-        self.search = re.search(channel_pattern, content, re.IGNORECASE)
-
-
-    @cached_property
-    def pornstar(self):
-        return self.search.group()
-
-    @cached_property
-    def is_channel(self):
-        return self.is_channel
-
-    @cached_property
-    def channel(self):
-        return
-
-
-
 class Video:
-    def __init__(self, url):
+    def __init__(self, url, content):
         """
         :param url: (str) The URL of the video
         """
-        self.url = self.check_url(url)
-        self.html_content = self.get_html_content()
+        self.url = url
+        self.html_content = content
 
-        if isinstance(self.html_content, requests.Response):
+        if isinstance(self.html_content, httpx.Response):
             if self.html_content.status_code == 404:
                 raise VideoUnavailable("The video is not available or the URL is incorrect.")
 
@@ -89,17 +65,9 @@ class Video:
         self.available_qualities = None
 
     @classmethod
-    def check_url(cls, url) -> str:
-        """
-        :param url: (str) The URL of the video
-        :return: (str) The URL of the video, if valid, otherwise raises InvalidUrl Exception
-        """
-        match = REGEX_VIDEO_CHECK_URL.match(url)
-        if match:
-            return url
-
-        else:
-            raise InvalidUrl(f"Invalid Video URL: {url}")
+    async def create(cls, url):
+        content = await core.fetch(url)
+        return cls(url, content)
 
     @classmethod
     def is_desired_script(cls, tag):
@@ -109,15 +77,16 @@ class Video:
         return all(content in tag.text for content in script_contents)
 
     def get_script_content(self):
-        soup = BeautifulSoup(self.html_content)
+        soup = BeautifulSoup(self.html_content, features="html.parser")
         target_script = soup.find(self.is_desired_script)
-        return target_script.text
+        try:
+            return target_script.text
 
-    def get_html_content(self) -> Union[str, requests.Response]:
-        return core.fetch(self.url)
+        except AttributeError:
+            raise f"Please report this error on GitHub. HTML: {self.html_content}"
 
     def extract_json_from_html(self):
-        soup = BeautifulSoup(self.html_content)
+        soup = BeautifulSoup(self.html_content, features="html.parser")
         script_tags = soup.find_all('script', {'type': 'application/ld+json'})
 
         combined_data = {}
@@ -147,15 +116,14 @@ class Video:
                 items.append((new_key, v))
         return dict(items)
 
-    def get_segments(self, quality) -> list:
+    async def get_segments(self, quality) -> list:
         """
         :param quality: (str, Quality) The video quality
         :return: (list) A list of segments (the .ts files)
         """
-        segments = core.get_segments(quality=quality, m3u8_url_master=self.m3u8_base_url)
-        return segments
+        return await core.get_segments(quality=quality, m3u8_url_master=self.m3u8_base_url)
 
-    def download(self, downloader, quality, path="./", callback=None, no_title=False) -> bool:
+    async def download(self, downloader, quality, path="./", callback=None, no_title=False) -> bool:
         """
         :param callback:
         :param downloader:
@@ -168,12 +136,12 @@ class Video:
             path = f"{path}{os.sep}{self.title}.mp4"
 
         try:
-            core.download(video=self, quality=quality, path=path, callback=callback, downloader=downloader)
+            await core.download(video=self, quality=quality, path=path, callback=callback, downloader=downloader)
             return True
 
         except AttributeError:
             logging.warning("Video doesn't have an HLS stream. Using legacy downloading instead...")
-            core.legacy_download(stream=True, path=path, callback=callback, url=self.cdn_url)
+            await core.legacy_download(path=path, callback=callback, url=self.cdn_url)
             return True
 
     @cached_property
@@ -258,16 +226,18 @@ class Video:
     def cdn_url(self) -> str:
         return self.json_data["contentUrl"]
 
-    @cached_property
-    def user(self) -> User:
-        return User(self.html_content)
-
 
 class Pornstar:
-    def __init__(self, url):
+    def __init__(self, url, content, data):
         self.url = url
-        base_content = core.fetch(f"{self.url}/videos/best/0")
-        self.data = json.loads(base_content)
+        self.content = content
+        self.data = data
+
+    @classmethod
+    async def create(cls, url):
+        content = await core.fetch(f"{url}/videos/best/0")
+        data = json.loads(content)
+        return cls(url, content, data)
 
     @cached_property
     def total_videos(self):
@@ -282,36 +252,43 @@ class Pornstar:
         return math.ceil(self.total_videos / self.per_page)
 
     @cached_property
-    def videos(self):
-        for idx in range(0, self.total_pages):
-            url_dynamic_javascript = core.fetch(f"{self.url}/videos/best/{idx}")
-            data = json.loads(url_dynamic_javascript)
+    async def videos(self):
+        final_video_urls = []
+        urls = [f"{self.url}/videos/best/{idx}" for idx in range(self.total_pages)]
 
+        tasks = [asyncio.create_task(core.fetch(url)) for url in urls]
+        final_urls = await asyncio.gather(*tasks)
+
+        parse_tasks = [asyncio.create_task(asyncio.to_thread(json.loads, result)) for result in final_urls]
+        parsed_results = await asyncio.gather(*parse_tasks)
+
+        for data in parsed_results:
             u_values = [video["u"] for video in data["videos"]]
             for video in u_values:
-                print(f"URL: {video}")
                 url = str(video).split("/")
-                print(f"URL 1: {url}")
                 id = url[4]
-                print(f"ID: {id}")
                 part_two = url[5]
-                yield Video(f"https://www.xvideos.com/video.{id}/{part_two}")
+                final_video_urls.append(f"https://www.xvideos.com/video.{id}/{part_two}")
+
+        video_tasks = [asyncio.create_task(Video.create(url)) for url in final_video_urls]
+        results = await asyncio.gather(*video_tasks)
+        return results
 
 
 class Client:
 
     @classmethod
-    def get_video(cls, url: str) -> Video:
+    async def get_video(cls, url: str) -> Video:
         """
         :param url: (str) The video URL
         :return: (Video) The video object
         """
-        return Video(url)
+        return await Video.create(url)
 
     @classmethod
     def extract_video_urls(cls, html_content: str) -> list:
         # Parse the HTML content with BeautifulSoup
-        soup = BeautifulSoup(html_content)
+        soup = BeautifulSoup(html_content, features="html.parser")
         video_urls = []
 
         # Find all 'div' elements with the class 'thumb'
@@ -326,31 +303,37 @@ class Client:
         return video_urls
 
     @classmethod
-    def search(cls, query: str, sorting_sort: Sort = Union[str, Sort.Sort_relevance],
-               sorting_date: Union[str, SortDate] = SortDate.Sort_all,
-               sorting_time: Union[str, SortVideoTime] = SortVideoTime.Sort_all,
-               sort_quality: Union[str, SortQuality] = SortQuality.Sort_all) -> Video:
+    async def search(cls, query: str, sorting_sort: Union[str, Sort] = Sort.Sort_relevance,
+                     sorting_date: Union[str, SortDate] = SortDate.Sort_all,
+                     sorting_time: Union[str, SortVideoTime] = SortVideoTime.Sort_all,
+                     sort_quality: Union[str, SortQuality] = SortQuality.Sort_all,
+                     pages: int = 5) -> List[Video]:
 
         query = query.replace(" ", "+")
 
         base_url = f"https://www.xvideos.com/?k={query}&sort={sorting_sort}%&datef={sorting_date}&durf={sorting_time}&quality={sort_quality}"
+        urls_for_searching = [f"{base_url}%p={page}" for page in range(pages)]
+        video_urls_for_processing = [asyncio.create_task(core.fetch(url)) for url in urls_for_searching]
+        results = await asyncio.gather(*video_urls_for_processing)
 
-        for page in range(100):
-            response = core.fetch(f"{base_url}&p={page}")
-            urls_ = Client.extract_video_urls(response)
+        extracted_urls = []
+        extracted_urls.extend(Client.extract_video_urls(result) for result in results)
 
-            for url in urls_:
-                url = f"https://www.xvideos.com{url}"
+        cleaned_urls = []
+        for multiple_urls in extracted_urls:
+            for url in multiple_urls:
+                cleaned_urls.append(f"https://www.xvideos.com{url}")
 
-                if REGEX_VIDEO_CHECK_URL.match(url):
-                    yield Video(url)
+        video_objects = [asyncio.create_task(Video.create(url)) for url in cleaned_urls]
+        results = await asyncio.gather(*video_objects)
+        return results
 
     @classmethod
-    def get_pornstar(cls, url) -> Pornstar:
-        return Pornstar(url)
+    async def get_pornstar(cls, url) -> Pornstar:
+        return await Pornstar.create(url)
 
 
-def main():
+async def main():
     parser = argparse.ArgumentParser(description="API Command Line Interface")
     parser.add_argument("--download", metavar="URL (str)", type=str, help="URL to download from")
     parser.add_argument("--quality", metavar="best,half,worst", type=str, help="The video quality (best,half,worst)",
@@ -367,9 +350,9 @@ def main():
 
     if args.download:
         client = Client()
-        video = client.get_video(args.download)
+        video = await client.get_video(args.download)
         path = BaseCore.return_path(args=args, video=video)
-        video.download(quality=args.quality, path=path, downloader=args.downloader)
+        await video.download(quality=args.quality, path=path, downloader=args.downloader)
 
     if args.file:
         videos = []
@@ -379,11 +362,12 @@ def main():
             content = file.read().splitlines()
 
         for url in content:
-            videos.append(client.get_video(url))
+            videos.append(await client.get_video(url))
 
         for video in videos:
             path = core.return_path(args=args, video=video)
-            video.download(quality=args.quality, path=path, downloader=args.downloader)
+            await video.download(quality=args.quality, path=path, downloader=args.downloader)
+
 
 
 if __name__ == "__main__":
