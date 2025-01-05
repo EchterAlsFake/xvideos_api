@@ -14,13 +14,13 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-import asyncio
 import os
 import math
 import html
 import json
 import httpx
 import logging
+import asyncio
 import argparse
 
 from bs4 import BeautifulSoup
