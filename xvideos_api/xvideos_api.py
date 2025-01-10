@@ -366,7 +366,7 @@ async def main():
     if args.download:
         client = Client()
         video = await client.get_video(args.download)
-        await video.download(quality=args.quality, path=args.output, downloader=args.downloader)
+        await video.download(quality=args.quality, path=args.output, downloader=args.downloader, no_title=no_title)
 
     if args.file:
         videos = []
@@ -379,7 +379,7 @@ async def main():
             videos.append(await client.get_video(url))
 
         for video in videos:
-            await video.download(quality=args.quality, path=args.output, downloader=args.downloader)
+            await video.download(quality=args.quality, path=args.output, downloader=args.downloader, no_title=no_title)
 
 
 
