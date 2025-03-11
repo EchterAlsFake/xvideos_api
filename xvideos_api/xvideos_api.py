@@ -22,10 +22,10 @@ import httpx
 import logging
 import argparse
 
-from typing import Union
 from bs4 import BeautifulSoup
-from base_api.base import BaseCore
+from typing import Union, Generator
 from functools import cached_property
+from base_api.base import BaseCore, setup_logger
 
 try:
     from modules.consts import *
@@ -38,19 +38,13 @@ except (ModuleNotFoundError, ImportError):
     from .modules.sorting import *
 
 core = BaseCore()
-logging.basicConfig(format='%(name)s %(levelname)s %(asctime)s %(message)s', datefmt='%I:%M:%S %p')
-logger = logging.getLogger("XVIDEOS API")
-logger.setLevel(logging.DEBUG)
 
 
-def refresh_core(): # Needed for Porn Fetch
+def refresh_core(enable_logging: bool = False, log_file: str = None, level = None): # Needed for Porn Fetch
     global core
     core = BaseCore()
-
-
-def disable_logging():
-    logger.setLevel(logging.CRITICAL)
-
+    if enable_logging:
+        core.enable_logging(log_file=log_file, level=level)
 
 
 class Video:
@@ -59,6 +53,7 @@ class Video:
         :param url: (str) The URL of the video
         """
         self.url = self.check_url(url)
+        self.logger = setup_logger(name="XVIDEOS API - [Video]", log_file=None, level=logging.CRITICAL)
         self.html_content = self.get_html_content()
 
         if isinstance(self.html_content, httpx.Response):
@@ -69,6 +64,9 @@ class Video:
         self.script_content = self.get_script_content()
         self.quality_url_map = None
         self.available_qualities = None
+
+    def enable_logging(self, log_file: str = None, level = None):
+        self.logger = setup_logger(name="XVIDEOS API - [Video]", log_file=log_file, level=level)
 
     @classmethod
     def check_url(cls, url) -> str:
@@ -154,7 +152,7 @@ class Video:
             return True
 
         except AttributeError:
-            logging.warning("Video doesn't have an HLS stream. Using legacy downloading instead...")
+            self.logger.warning("Video doesn't have an HLS stream. Using legacy downloading instead...")
             core.legacy_download(path=path, callback=callback, url=self.cdn_url)
             return True
 
@@ -220,6 +218,7 @@ class Video:
             uploader = REGEX_VIDEO_UPLOADER.search(self.html_content).group(1)
 
         except AttributeError:
+            self.logger.warning("Couldn't find the video author!")
             uploader = "Unknown"
 
         return uploader
@@ -246,6 +245,10 @@ class Pornstar:
         self.url = url
         base_content = core.fetch(f"{self.url}/videos/best/0")
         self.data = json.loads(base_content)
+        self.logger = setup_logger(name="XVIDEOS API - [Pornstar]", log_file=None, level=logging.CRITICAL)
+
+    def enable_logging(self, log_file: str = None, level=None):
+        self.logger = setup_logger(name="XVIDEOS API - [Pornstar]", log_file=log_file, level=level)
 
     @cached_property
     def total_videos(self):
@@ -261,7 +264,9 @@ class Pornstar:
 
     @cached_property
     def videos(self):
+        self.logger.debug(f"Pornstar has: {self.total_pages} pages...")
         for idx in range(0, self.total_pages):
+            self.logger.debug(f"Iterating for page: {idx}")
             url_dynamic_javascript = core.fetch(f"{self.url}/videos/best/{idx}")
             data = json.loads(url_dynamic_javascript)
 
@@ -274,6 +279,11 @@ class Pornstar:
 
 
 class Client:
+    def __init__(self):
+        self.logger = setup_logger(name="XVIDEOS API - [Client]", log_file=None, level=logging.CRITICAL)
+
+    def enable_logging(self, log_file: str = None, level=None):
+        self.logger = setup_logger(name="XVIDEOS API - [Client]", log_file=log_file, level=level)
 
     @classmethod
     def get_video(cls, url: str) -> Video:
@@ -300,17 +310,19 @@ class Client:
 
         return video_urls
 
-    @classmethod
-    def search(cls, query: str, sorting_sort: Sort = Union[str, Sort.Sort_relevance],
+
+    def search(self, query: str, sorting_sort: Sort = Union[str, Sort.Sort_relevance],
                sorting_date: Union[str, SortDate] = SortDate.Sort_all,
                sorting_time: Union[str, SortVideoTime] = SortVideoTime.Sort_all,
-               sort_quality: Union[str, SortQuality] = SortQuality.Sort_all) -> Video:
+               sort_quality: Union[str, SortQuality] = SortQuality.Sort_all) -> Generator[Video, None, None]:
 
         query = query.replace(" ", "+")
-
+        self.logger.info(f"Replaced query to: {query}")
         base_url = f"https://www.xvideos.com/?k={query}&sort={sorting_sort}%&datef={sorting_date}&durf={sorting_time}&quality={sort_quality}"
+        self.logger.debug(f"Requesting with base url: {base_url}")
 
         for page in range(100):
+            self.logger.debug(f"Iterating for page: {page}")
             response = core.fetch(f"{base_url}&p={page}")
             urls_ = Client.extract_video_urls(response)
 
