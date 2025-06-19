@@ -1,6 +1,6 @@
 from ..xvideos_api import Client
 
-url = "https://www.xvideos.com/video79875801/wow_what_a_dick_how_about_ass_fucking_"
+url = "https://de.xvideos.com/video.ohplvhk02fd/meine_lesbische_freundin_hat_mich_beim_fremdgehen_mit_einem_zufalligen_typen_erwischt_aber_ich_kann_nicht_aufhoren_und_ficke_ihn_weiter_vor_ihren_augen_"
 # This URL will be used for all tests
 
 client = Client()

@@ -26,6 +26,7 @@ from bs4 import BeautifulSoup
 from typing import Union, Generator
 from functools import cached_property
 from base_api.base import BaseCore, setup_logger
+from base_api.modules import config
 
 try:
     from modules.consts import *
@@ -40,9 +41,10 @@ except (ModuleNotFoundError, ImportError):
 core = BaseCore()
 
 
-def refresh_core(enable_logging: bool = False, log_file: str = None, level = None): # Needed for Porn Fetch
+def refresh_core(custom_config=None, enable_logging: bool = False, log_file: str = None, level = None): # Needed for Porn Fetch
     global core
-    core = BaseCore()
+    cfg = config
+    core = BaseCore(cfg)
     if enable_logging:
         core.enable_logging(log_file=log_file, level=level)
 
