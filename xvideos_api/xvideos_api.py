@@ -43,7 +43,7 @@ core = BaseCore()
 
 def refresh_core(custom_config=None, enable_logging: bool = False, log_file: str = None, level = None): # Needed for Porn Fetch
     global core
-    cfg = config
+    cfg = custom_config or config
     core = BaseCore(cfg)
     if enable_logging:
         core.enable_logging(log_file=log_file, level=level)
