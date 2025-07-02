@@ -26,7 +26,6 @@ from bs4 import BeautifulSoup
 from typing import Union, Generator
 from functools import cached_property
 from base_api.base import BaseCore, setup_logger
-from base_api.modules import config
 
 try:
     from modules.consts import *
@@ -38,22 +37,13 @@ except (ModuleNotFoundError, ImportError):
     from .modules.exceptions import *
     from .modules.sorting import *
 
-core = BaseCore()
-
-
-def refresh_core(custom_config=None, enable_logging: bool = False, log_file: str = None, level = None): # Needed for Porn Fetch
-    global core
-    cfg = custom_config or config
-    core = BaseCore(cfg)
-    if enable_logging:
-        core.enable_logging(log_file=log_file, level=level)
-
 
 class Video:
-    def __init__(self, url):
+    def __init__(self, url, core=None):
         """
         :param url: (str) The URL of the video
         """
+        self.core = core
         self.url = self.check_url(url)
         self.logger = setup_logger(name="XVIDEOS API - [Video]", log_file=None, level=logging.CRITICAL)
         self.html_content = self.get_html_content()
@@ -96,7 +86,7 @@ class Video:
         return target_script.text
 
     def get_html_content(self) -> Union[str, httpx.Response]:
-        return core.fetch(self.url)
+        return self.core.fetch(self.url)
 
     def extract_json_from_html(self):
         soup = BeautifulSoup(self.html_content, features="html.parser")
@@ -134,7 +124,7 @@ class Video:
         :param quality: (str, Quality) The video quality
         :return: (list) A list of segments (the .ts files)
         """
-        segments = core.get_segments(quality=quality, m3u8_url_master=self.m3u8_base_url)
+        segments = self.core.get_segments(quality=quality, m3u8_url_master=self.m3u8_base_url)
         return segments
 
     def download(self, downloader, quality, path="./", callback=None, no_title=False) -> bool:
@@ -150,12 +140,12 @@ class Video:
             path = os.path.join(path, f"{self.title}.mp4")
 
         try:
-            core.download(video=self, quality=quality, path=path, callback=callback, downloader=downloader)
+            self.core.download(video=self, quality=quality, path=path, callback=callback, downloader=downloader)
             return True
 
         except AttributeError:
             self.logger.warning("Video doesn't have an HLS stream. Using legacy downloading instead...")
-            core.legacy_download(path=path, callback=callback, url=self.cdn_url)
+            self.core.legacy_download(path=path, callback=callback, url=self.cdn_url)
             return True
 
     @cached_property
@@ -243,9 +233,10 @@ class Video:
 
 
 class Pornstar:
-    def __init__(self, url):
+    def __init__(self, url, core):
+        self.core = core
         self.url = url
-        base_content = core.fetch(f"{self.url}/videos/best/0")
+        base_content = self.core.fetch(f"{self.url}/videos/best/0")
         self.data = json.loads(base_content)
         self.logger = setup_logger(name="XVIDEOS API - [Pornstar]", log_file=None, level=logging.CRITICAL)
 
@@ -269,7 +260,7 @@ class Pornstar:
         self.logger.debug(f"Pornstar has: {self.total_pages} pages...")
         for idx in range(0, self.total_pages):
             self.logger.debug(f"Iterating for page: {idx}")
-            url_dynamic_javascript = core.fetch(f"{self.url}/videos/best/{idx}")
+            url_dynamic_javascript = self.core.fetch(f"{self.url}/videos/best/{idx}")
             data = json.loads(url_dynamic_javascript)
 
             u_values = [video["u"] for video in data["videos"]]
@@ -277,23 +268,23 @@ class Pornstar:
                 url = str(video).split("/")
                 id = url[4]
                 part_two = url[5]
-                yield Video(f"https://www.xvideos.com/video.{id}/{part_two}")
+                yield Video(f"https://www.xvideos.com/video.{id}/{part_two}", core=self.core)
 
 
 class Client:
-    def __init__(self):
+    def __init__(self, core=None):
+        self.core = core or BaseCore()
         self.logger = setup_logger(name="XVIDEOS API - [Client]", log_file=None, level=logging.CRITICAL)
 
     def enable_logging(self, log_file: str = None, level=None):
         self.logger = setup_logger(name="XVIDEOS API - [Client]", log_file=log_file, level=level)
 
-    @classmethod
-    def get_video(cls, url: str) -> Video:
+    def get_video(self, url: str) -> Video:
         """
         :param url: (str) The video URL
         :return: (Video) The video object
         """
-        return Video(url)
+        return Video(url, core=self.core)
 
     @classmethod
     def extract_video_urls(cls, html_content: str) -> list:
@@ -325,18 +316,17 @@ class Client:
 
         for page in range(100):
             self.logger.debug(f"Iterating for page: {page}")
-            response = core.fetch(f"{base_url}&p={page}")
+            response = self.core.fetch(f"{base_url}&p={page}")
             urls_ = Client.extract_video_urls(response)
 
             for url in urls_:
                 url = f"https://www.xvideos.com{url}"
 
                 if REGEX_VIDEO_CHECK_URL.match(url):
-                    yield Video(url)
+                    yield Video(url, core=self.core)
 
-    @classmethod
-    def get_pornstar(cls, url) -> Pornstar:
-        return Pornstar(url)
+    def get_pornstar(self, url) -> Pornstar:
+        return Pornstar(url, core=self.core)
 
 
 def main():
