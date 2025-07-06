@@ -232,24 +232,39 @@ class Video:
         return self.json_data["contentUrl"]
 
 
-class Pornstar:
-    def __init__(self, url, core):
+class Channel:
+    """
+    Returns the Channel object for a Channel. Please note, that the Channel object and the Pornstar object
+    are almost identical, but I still differentiated them as two different classes, because TECHNICALLY they are
+    different things.
+
+    """
+    def __init__(self, url: str, core: BaseCore):
         self.core = core
+        self.logger = setup_logger(name="XVIDEOS API - [Channel]", log_file=None, level=logging.ERROR)
         self.url = self.check_url(url)
         base_content = self.core.fetch(f"{self.url}/videos/best/0")
+        about_me_html = self.core.fetch(f"{self.url}#_tabAboutMe")
+        self.bs4_about_me = BeautifulSoup(about_me_html, "html.parser")
         self.data = json.loads(base_content)
-        self.logger = setup_logger(name="XVIDEOS API - [Pornstar]", log_file=None, level=logging.CRITICAL)
 
-    def enable_logging(self, log_file: str = None, level=None, log_ip=None, log_port=None):
-        self.logger = setup_logger(name="XVIDEOS API - [Pornstar]", log_file=log_file, level=level, http_ip=log_ip, http_port=log_port)
+    def enable_logging(self, name="XVIDEOS API - [Channel]", log_file=None, level=logging.DEBUG, log_ip=None, log_port=None):
+        self.logger = setup_logger(name=name, log_file=log_file, level=level, http_ip=log_ip, http_port=log_port)
 
-    def check_url(self, url):
-        if not "/pornstars/" in url:
-            self.logger.error("URL doesn't contain '/pornstars/', seems like a channel URL or is generally invalid!")
-            raise InvalidPornstar(
-                "It seems like the Pornstar URL is invalid, please note, that channels are NOT supported!")
+    def check_url(self, url: str) -> str:
+        if 'channels' not in url and 'profiles' not in url:
+            self.logger.error(f"URL: {url} is not a valid channel URL!")
+            raise InvalidChannel("The URL is not a channel, maybe a Pornstar instead?")
 
         return url
+
+    @cached_property
+    def name(self) -> str:
+        return self.bs4_about_me.find('h2').find_all('strong', attrs={'class': 'text-danger'})[0].text
+
+    @cached_property
+    def thumbnail_url(self) -> str:
+        return self.bs4_about_me.find('div', attrs={'class': 'profile-pic'}).find_all('img')[0]['src']
 
     @cached_property
     def total_videos(self):
@@ -278,11 +293,160 @@ class Pornstar:
                 part_two = url[5]
                 yield Video(f"https://www.xvideos.com/video.{id}/{part_two}", core=self.core)
 
+    @cached_property
+    def country(self) -> str:
+        return self.bs4_about_me.find(id="pinfo-country").span.text.strip()
+
+    @cached_property
+    def profile_hits(self) -> str:
+        return self.bs4_about_me.find(id="pinfo-profile-hits").span.text.strip()
+
+    @cached_property
+    def subscribers(self) -> str:
+        return self.bs4_about_me.find(id="pinfo-subscribers").span.text.strip()
+
+    @cached_property
+    def total_video_views(self) -> str:
+        return self.bs4_about_me.find(id="pinfo-video-views").span.text.strip()
+
+    @cached_property
+    def region(self) -> str:
+        return self.bs4_about_me.find(id="pinfo-region").span.text.strip()
+
+    @cached_property
+    def signed_up(self) -> str:
+        return self.bs4_about_me.find(id="pinfo-signedup").span.text.strip()
+
+    @cached_property
+    def last_activity(self) -> str:
+        return self.bs4_about_me.find(id="pinfo-lastactivity").span.text.strip()
+
+    @cached_property
+    def worked_for_with(self):
+        names = self.bs4_about_me.find(id="pinfo-workedfor").find_all('a')
+        links = [a['href'] for a in names]
+        for link in links:
+            return Channel(core=self.core, url=f"https://www.xvideos.com{link}")
+
+
+class Pornstar:
+    def __init__(self, url: str, core: BaseCore):
+        self.core = core
+        self.url = self.check_url(url)
+        base_content = self.core.fetch(f"{self.url}/videos/best/0")
+        about_me_html = self.core.fetch(f"{self.url}#_tabAboutMe")
+        self.bs4_about_me = BeautifulSoup(about_me_html, "html.parser")
+        self.data = json.loads(base_content)
+        self.logger = setup_logger(name="XVIDEOS API - [Pornstar]", log_file=None, level=logging.ERROR)
+
+    def enable_logging(self, log_file: str = None, level=None, log_ip=None, log_port=None):
+        self.logger = setup_logger(name="XVIDEOS API - [Pornstar]", log_file=log_file, level=level, http_ip=log_ip, http_port=log_port)
+
+    def check_url(self, url):
+        if not "/pornstars/" in url:
+            self.logger.error("URL doesn't contain '/pornstars/', seems like a channel URL or is generally invalid!")
+            raise InvalidPornstar(
+                "It seems like the Pornstar URL is invalid, please note, that channels are NOT supported!")
+
+        return url
+
+    @cached_property
+    def name(self) -> str:
+        return self.bs4_about_me.find('h2').find_all('strong', attrs={'class': 'text-danger'})[0].text
+
+    @cached_property
+    def thumbnail_url(self) -> str:
+        return self.bs4_about_me.find('div', attrs={'class': 'profile-pic'}).find_all('img')[0]['src']
+
+    @cached_property
+    def total_videos(self):
+        return int(self.data["nb_videos"])
+
+    @cached_property
+    def per_page(self):
+        return int(self.data["nb_per_page"])
+
+    @cached_property
+    def total_pages(self):
+        return math.ceil(self.total_videos / self.per_page)
+
+    @cached_property
+    def videos(self):
+        for idx in range(0, self.total_pages):
+            self.logger.debug(f"Iterating for page: {idx}")
+            url_dynamic_javascript = self.core.fetch(f"{self.url}/videos/best/{idx}")
+            data = json.loads(url_dynamic_javascript)
+
+            u_values = [video["u"] for video in data["videos"]]
+            for video in u_values:
+                url = str(video).split("/")
+                id = url[4]
+                part_two = url[5]
+                yield Video(f"https://www.xvideos.com/video.{id}/{part_two}", core=self.core)
+
+    @cached_property
+    def gender(self) -> str:
+        return self.bs4_about_me.find(id="pinfo-sex").span.text.strip()
+
+    @cached_property
+    def age(self) -> str:
+        """Returns the age of the Pornstar"""
+        age = self.bs4_about_me.find(id="pinfo-age").span.text.strip()
+        if int(age) < 18: # lmaooooo
+            raise "Wait what????"
+
+        return age
+
+    @cached_property
+    def country(self) -> str:
+        """Returns the country of the Pornstar"""
+        return self.bs4_about_me.find(id="pinfo-country").span.text.strip()
+
+    @cached_property
+    def profile_hits(self) -> str:
+        """Returns the current profile hits count (don't know what that is lol)"""
+        return self.bs4_about_me.find(id="pinfo-profile-hits").span.text.strip()
+
+    @cached_property
+    def subscriber_count(self) -> str:
+        """Returns the current subscriber count of the pornstar"""
+        return self.bs4_about_me.find(id="pinfo-subscribers").span.text.strip()
+
+    @cached_property
+    def total_videos_views(self) -> str:
+        """Returns the total video views of the pornstar of all videos combined"""
+        return self.bs4_about_me.find(id="pinfo-videos-views").span.text.strip()
+
+    @cached_property
+    def sign_up_date(self) -> str:
+        """Returns the date where the pornstar signed up his / her account"""
+        return self.bs4_about_me.find(id="pinfo-signedup").span.text.strip()
+
+    @cached_property
+    def last_activity(self) -> str:
+        """Returns the date of the last activity of the Pornstar"""
+        return self.bs4_about_me.find(id="pinfo-lastactivity").span.text.strip()
+
+    @cached_property
+    def video_tags(self) -> str:
+        """Returns the video tags the pornstar is often featured in"""
+        return self.bs4_about_me.find(id="pinfo-video-tags").span.text.strip()
+
+    @cached_property
+    def worked_for_with(self) -> Generator[Channel, None, None]:
+        """
+        Returns the channels the pornstar has worked with as a Channel object (Generator)
+        """
+        names = self.bs4_about_me.find(id="pinfo-workedfor").find_all('a')
+        links = [a['href'] for a in names]
+        for link in links:
+            yield Channel(core=self.core, url=f"https://www.xvideos.com{link}")
+
 
 class Client:
     def __init__(self, core=None):
         self.core = core or BaseCore()
-        self.logger = setup_logger(name="XVIDEOS API - [Client]", log_file=None, level=logging.CRITICAL)
+        self.logger = setup_logger(name="XVIDEOS API - [Client]", log_file=None, level=logging.ERROR)
 
     def enable_logging(self, log_file: str = None, level=None, log_ip=None, log_port=None):
         self.logger = setup_logger(name="XVIDEOS API - [Client]", log_file=log_file, level=level, http_ip=log_ip, http_port=log_port)
@@ -336,6 +500,9 @@ class Client:
 
     def get_pornstar(self, url) -> Pornstar:
         return Pornstar(url, core=self.core)
+
+    def get_channel(self, url) -> Channel:
+        return Channel(url, core=self.core)
 
 
 def main():
