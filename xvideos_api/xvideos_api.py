@@ -486,7 +486,7 @@ class Client:
         return video_urls
 
 
-    def search(self, query: str, sorting_sort: Sort = Union[str, Sort.Sort_relevance],
+    def search(self, query: str, sorting_sort: Union[str, Sort.Sort_relevance] = Sort.Sort_relevance,
                sorting_date: Union[str, SortDate] = SortDate.Sort_all,
                sorting_time: Union[str, SortVideoTime] = SortVideoTime.Sort_all,
                sort_quality: Union[str, SortQuality] = SortQuality.Sort_all,
