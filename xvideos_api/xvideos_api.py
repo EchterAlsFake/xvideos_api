@@ -29,12 +29,12 @@ from base_api.base import BaseCore, setup_logger
 
 try:
     from modules.consts import *
-    from modules.exceptions import *
+    from modules.errors import *
     from modules.sorting import *
 
 except (ModuleNotFoundError, ImportError):
     from .modules.consts import *
-    from .modules.exceptions import *
+    from .modules.errors import *
     from .modules.sorting import *
 
 
@@ -57,8 +57,8 @@ class Video:
         self.quality_url_map = None
         self.available_qualities = None
 
-    def enable_logging(self, log_file: str = None, level = None):
-        self.logger = setup_logger(name="XVIDEOS API - [Video]", log_file=log_file, level=level)
+    def enable_logging(self, log_file: str = None, level = None, log_ip=None, log_port=None):
+        self.logger = setup_logger(name="XVIDEOS API - [Video]", log_file=log_file, level=level, http_ip=log_ip, http_port=log_port)
 
     @classmethod
     def check_url(cls, url) -> str:
@@ -136,7 +136,7 @@ class Video:
         :param no_title:
         :return:
         """
-        if no_title is False:
+        if not no_title:
             path = os.path.join(path, f"{self.title}.mp4")
 
         try:
@@ -235,13 +235,21 @@ class Video:
 class Pornstar:
     def __init__(self, url, core):
         self.core = core
-        self.url = url
+        self.url = self.check_url(url)
         base_content = self.core.fetch(f"{self.url}/videos/best/0")
         self.data = json.loads(base_content)
         self.logger = setup_logger(name="XVIDEOS API - [Pornstar]", log_file=None, level=logging.CRITICAL)
 
-    def enable_logging(self, log_file: str = None, level=None):
-        self.logger = setup_logger(name="XVIDEOS API - [Pornstar]", log_file=log_file, level=level)
+    def enable_logging(self, log_file: str = None, level=None, log_ip=None, log_port=None):
+        self.logger = setup_logger(name="XVIDEOS API - [Pornstar]", log_file=log_file, level=level, http_ip=log_ip, http_port=log_port)
+
+    def check_url(self, url):
+        if not "/pornstars/" in url:
+            self.logger.error("URL doesn't contain '/pornstars/', seems like a channel URL or is generally invalid!")
+            raise InvalidPornstar(
+                "It seems like the Pornstar URL is invalid, please note, that channels are NOT supported!")
+
+        return url
 
     @cached_property
     def total_videos(self):
@@ -276,8 +284,8 @@ class Client:
         self.core = core or BaseCore()
         self.logger = setup_logger(name="XVIDEOS API - [Client]", log_file=None, level=logging.CRITICAL)
 
-    def enable_logging(self, log_file: str = None, level=None):
-        self.logger = setup_logger(name="XVIDEOS API - [Client]", log_file=log_file, level=level)
+    def enable_logging(self, log_file: str = None, level=None, log_ip=None, log_port=None):
+        self.logger = setup_logger(name="XVIDEOS API - [Client]", log_file=log_file, level=level, http_ip=log_ip, http_port=log_port)
 
     def get_video(self, url: str) -> Video:
         """
@@ -307,14 +315,15 @@ class Client:
     def search(self, query: str, sorting_sort: Sort = Union[str, Sort.Sort_relevance],
                sorting_date: Union[str, SortDate] = SortDate.Sort_all,
                sorting_time: Union[str, SortVideoTime] = SortVideoTime.Sort_all,
-               sort_quality: Union[str, SortQuality] = SortQuality.Sort_all) -> Generator[Video, None, None]:
+               sort_quality: Union[str, SortQuality] = SortQuality.Sort_all,
+               pages=5) -> Generator[Video, None, None]:
 
         query = query.replace(" ", "+")
         self.logger.info(f"Replaced query to: {query}")
         base_url = f"https://www.xvideos.com/?k={query}&sort={sorting_sort}%&datef={sorting_date}&durf={sorting_time}&quality={sort_quality}"
         self.logger.debug(f"Requesting with base url: {base_url}")
 
-        for page in range(100):
+        for page in range(pages):
             self.logger.debug(f"Iterating for page: {page}")
             response = self.core.fetch(f"{base_url}&p={page}")
             urls_ = Client.extract_video_urls(response)
