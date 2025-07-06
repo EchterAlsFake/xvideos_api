@@ -32,3 +32,11 @@
 # 1.5.1
 - switched to httpx
 - removed lxml and requests from project dependencies
+
+# 1.5.7
+- Channel support
+- Added Channel and Pornstar metadata from the #about_me tab
+- Switched project to Beautifulsoup from regular expressions
+- "author" from video object will now reference the actual channel object instead of a name
+- "pornstar" objects from videos will now reference the actual Pornstar objects instead of names
+- Enabled network logging

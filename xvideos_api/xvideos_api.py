@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 Johannes Habel
+Copyright (C) 2024-2025 Johannes Habel
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -45,8 +45,9 @@ class Video:
         """
         self.core = core
         self.url = self.check_url(url)
-        self.logger = setup_logger(name="XVIDEOS API - [Video]", log_file=None, level=logging.CRITICAL)
+        self.logger = setup_logger(name="XVIDEOS API - [Video]", log_file=None, level=logging.ERROR)
         self.html_content = self.get_html_content()
+        self.soup = BeautifulSoup(self.html_content, 'html.parser')
 
         if isinstance(self.html_content, httpx.Response):
             if self.html_content.status_code == 404:
@@ -182,46 +183,55 @@ class Video:
 
     @cached_property
     def tags(self) -> list:
-        return REGEX_VIDEO_TAGS.findall(self.html_content)
+        a_tags = self.soup.find_all('a', class_="is-keyword btn btn-default")
+        tags = []
+        for tag in a_tags:
+            tags.append(tag.text)
+
+        return tags
 
     @cached_property
     def views(self) -> str:
-        return REGEX_VIDEO_VIEWS.search(self.html_content).group(1)
+        return self.soup.find('span', class_='icon-f icf-eye').next.text
 
     @cached_property
     def likes(self) -> str:
-        return REGEX_VIDEO_RATING_LIKES.search(self.html_content).group(1)
+        return self.soup.find('span', class_='rating-good-nbr').text
 
     @cached_property
     def dislikes(self) -> str:
-        return REGEX_VIDEO_RATING_DISLIKES.search(self.html_content).group(1)
+        return self.soup.find('span', class_='rating-bad-nbr').text
 
     @cached_property
     def rating_votes(self) -> str:
-        return REGEX_VIDEO_RATING_VOTES.search(self.html_content).group(1)
+        return self.soup.find('span', class_='rating-total-txt').text
 
     @cached_property
     def comment_count(self) -> str:
-        return REGEX_VIDEO_COMMENT_COUNT.search(self.html_content).group(1)
+        return self.soup.find('button', class_="comments tab-button").next.next.text
 
     @cached_property
-    def author(self) -> str:
-        try:
-            uploader = REGEX_VIDEO_UPLOADER.search(self.html_content).group(1)
-
-        except AttributeError:
-            self.logger.warning("Couldn't find the video author!")
-            uploader = "Unknown"
-
-        return uploader
+    def author(self):
+        """Returns the Channel object where the video was published on"""
+        link = self.soup.find("li", class_="main-uploader").find('a')["href"]
+        return Channel(url=f"https://xvideos.com/channels{link}", core=self.core)
 
     @cached_property
     def length(self) -> str:
-        return REGEX_VIDEO_LENGTH.search(self.html_content).group(1)
+        return self.soup.find('span', class_="duration").text
 
     @cached_property
-    def pornstars(self) -> list:
-        return REGEX_VIDEO_PORNSTARS.findall(self.html_content)
+    def pornstars(self):
+        """
+        Returns the Pornstar objects for the Pornstars that are featured in the video
+        """
+        pornstars = self.soup.find_all('li', class_="model")
+        urls = []
+        for pornstar in pornstars:
+            urls.append(f"https://xvideos.com{pornstar.next["href"]}")
+
+        for url in urls:
+            yield Pornstar(url=url, core=self.core)
 
     @cached_property
     def embed_url(self) -> str:
@@ -343,7 +353,7 @@ class Pornstar:
         self.logger = setup_logger(name="XVIDEOS API - [Pornstar]", log_file=log_file, level=level, http_ip=log_ip, http_port=log_port)
 
     def check_url(self, url):
-        if not "/pornstars/" in url:
+        if not "/pornstars/" and not "/model/" in url:
             self.logger.error("URL doesn't contain '/pornstars/', seems like a channel URL or is generally invalid!")
             raise InvalidPornstar(
                 "It seems like the Pornstar URL is invalid, please note, that channels are NOT supported!")

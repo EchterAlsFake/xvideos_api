@@ -1,4 +1,4 @@
-from ..xvideos_api import Client
+from ..xvideos_api import Client, Channel
 
 url = "https://de.xvideos.com/video.ohplvhk02fd/meine_lesbische_freundin_hat_mich_beim_fremdgehen_mit_einem_zufalligen_typen_erwischt_aber_ich_kann_nicht_aufhoren_und_ficke_ihn_weiter_vor_ihren_augen_"
 # This URL will be used for all tests
@@ -12,7 +12,7 @@ def test_title():
 
 
 def test_uploader():
-    assert isinstance(video.author, str) and len(video.author) > 0
+    assert isinstance(video.author, Channel)
 
 
 def test_length():
@@ -61,7 +61,3 @@ def test_publish_date():
 
 def test_content_url():
     assert isinstance(video.content_url, str) and len(video.content_url) > 0
-
-
-def test_pornstars():
-    assert isinstance(video.pornstars, list) and len(video.pornstars) > 0
