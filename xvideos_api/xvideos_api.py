@@ -128,20 +128,23 @@ class Video:
         segments = self.core.get_segments(quality=quality, m3u8_url_master=self.m3u8_base_url)
         return segments
 
-    def download(self, downloader, quality, path="./", callback=None, no_title=False) -> bool:
+    def download(self, downloader, quality, path="./", callback=None, no_title=False, remux: bool = False, callback_remux=None) -> bool:
         """
         :param callback:
         :param downloader:
         :param quality:
         :param path:
         :param no_title:
+        :param remux:
+        :param callback_remux:
         :return:
         """
         if not no_title:
             path = os.path.join(path, f"{self.title}.mp4")
 
         try:
-            self.core.download(video=self, quality=quality, path=path, callback=callback, downloader=downloader)
+            self.core.download(video=self, quality=quality, path=path, callback=callback, downloader=downloader,
+                               remux=remux, callback_remux=callback_remux)
             return True
 
         except AttributeError:
