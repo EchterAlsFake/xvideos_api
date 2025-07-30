@@ -23,8 +23,8 @@ import logging
 import argparse
 
 from bs4 import BeautifulSoup
-from typing import Union, Generator
 from functools import cached_property
+from typing import Union, Generator, Optional
 from base_api.base import BaseCore, setup_logger
 
 try:
@@ -39,7 +39,7 @@ except (ModuleNotFoundError, ImportError):
 
 
 class Video:
-    def __init__(self, url, core=None):
+    def __init__(self, url, core: Optional[BaseCore] = None):
         """
         :param url: (str) The URL of the video
         """
@@ -252,7 +252,7 @@ class Channel:
     different things.
 
     """
-    def __init__(self, url: str, core: BaseCore):
+    def __init__(self, url: str, core: Optional[BaseCore]):
         self.core = core
         self.logger = setup_logger(name="XVIDEOS API - [Channel]", log_file=None, level=logging.ERROR)
         self.url = self.check_url(url)
@@ -343,7 +343,7 @@ class Channel:
 
 
 class Pornstar:
-    def __init__(self, url: str, core: BaseCore):
+    def __init__(self, url: str, core: Optional[BaseCore]):
         self.core = core
         self.url = self.check_url(url)
         base_content = self.core.fetch(f"{self.url}/videos/best/0")
@@ -457,7 +457,7 @@ class Pornstar:
 
 
 class Client:
-    def __init__(self, core=None):
+    def __init__(self, core: Optional[BaseCore]=None):
         self.core = core or BaseCore()
         self.logger = setup_logger(name="XVIDEOS API - [Client]", log_file=None, level=logging.ERROR)
 
