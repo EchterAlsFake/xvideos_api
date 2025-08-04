@@ -231,7 +231,7 @@ class Video:
         pornstars = self.soup.find_all('li', class_="model")
         urls = []
         for pornstar in pornstars:
-            urls.append(f"https://xvideos.com{pornstar.next["href"]}")
+            urls.append(f"https://xvideos.com{pornstar.next['href']}")
 
         for url in urls:
             yield Pornstar(url=url, core=self.core)

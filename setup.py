@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="xvideos_api",
-    version="1.5.9",
+    version="1.6.2",
     packages=find_packages(),
     install_requires=["bs4", "eaf_base_api", "httpx"],
     entry_points={
