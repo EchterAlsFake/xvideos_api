@@ -26,6 +26,7 @@ from bs4 import BeautifulSoup
 from functools import cached_property
 from typing import Union, Generator, Optional
 from base_api.base import BaseCore, setup_logger
+from base_api.modules.config import RuntimeConfig
 
 try:
     from modules.consts import *
@@ -457,8 +458,12 @@ class Pornstar:
 
 
 class Client:
-    def __init__(self, core: Optional[BaseCore]=None):
-        self.core = core or BaseCore()
+    def __init__(self, core: Optional[BaseCore] = None):
+        self.core = core or BaseCore(config=RuntimeConfig())
+        if self.core.session is None:
+            self.core.initialize_session()
+
+        self.core.session.headers = headers
         self.logger = setup_logger(name="XVIDEOS API - [Client]", log_file=None, level=logging.ERROR)
 
     def enable_logging(self, log_file: str = None, level=None, log_ip=None, log_port=None):
