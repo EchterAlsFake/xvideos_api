@@ -59,7 +59,7 @@ class Video:
         self.quality_url_map = None
         self.available_qualities = None
 
-    def enable_logging(self, log_file: str = None, level = None, log_ip=None, log_port=None):
+    def enable_logging(self, log_file: str = None, level = None, log_ip: str = None, log_port: int = None):
         self.logger = setup_logger(name="XVIDEOS API - [Video]", log_file=log_file, level=level, http_ip=log_ip, http_port=log_port)
 
     @classmethod
@@ -262,7 +262,7 @@ class Channel:
         self.bs4_about_me = BeautifulSoup(about_me_html, "html.parser")
         self.data = json.loads(base_content)
 
-    def enable_logging(self, name="XVIDEOS API - [Channel]", log_file=None, level=logging.DEBUG, log_ip=None, log_port=None):
+    def enable_logging(self, name="XVIDEOS API - [Channel]", log_file=None, level=logging.DEBUG, log_ip: str = None, log_port: int = None):
         self.logger = setup_logger(name=name, log_file=log_file, level=level, http_ip=log_ip, http_port=log_port)
 
     def check_url(self, url: str) -> str:
@@ -353,7 +353,7 @@ class Pornstar:
         self.data = json.loads(base_content)
         self.logger = setup_logger(name="XVIDEOS API - [Pornstar]", log_file=None, level=logging.ERROR)
 
-    def enable_logging(self, log_file: str = None, level=None, log_ip=None, log_port=None):
+    def enable_logging(self, log_file: str = None, level=None, log_ip: str = None, log_port: int = None):
         self.logger = setup_logger(name="XVIDEOS API - [Pornstar]", log_file=log_file, level=level, http_ip=log_ip, http_port=log_port)
 
     def check_url(self, url):
@@ -460,13 +460,10 @@ class Pornstar:
 class Client:
     def __init__(self, core: Optional[BaseCore] = None):
         self.core = core or BaseCore(config=RuntimeConfig())
-        if self.core.session is None:
-            self.core.initialize_session()
-
-        self.core.session.headers = headers
+        self.core.initialize_session(headers)
         self.logger = setup_logger(name="XVIDEOS API - [Client]", log_file=None, level=logging.ERROR)
 
-    def enable_logging(self, log_file: str = None, level=None, log_ip=None, log_port=None):
+    def enable_logging(self, log_file: str = None, level=None, log_ip: str = None, log_port: int = None):
         self.logger = setup_logger(name="XVIDEOS API - [Client]", log_file=log_file, level=level, http_ip=log_ip, http_port=log_port)
 
     def get_video(self, url: str) -> Video:
