@@ -1,5 +1,5 @@
 __all__ = ["Client", "Video", "Pornstar", "sorting",
-           "errors.py", "consts"]
+           "errors", "consts"]
 
 
 from xvideos_api.xvideos_api import Client, Video, Pornstar

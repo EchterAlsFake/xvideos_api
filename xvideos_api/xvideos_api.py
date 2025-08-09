@@ -218,7 +218,11 @@ class Video:
     def author(self):
         """Returns the Channel object where the video was published on"""
         link = self.soup.find("li", class_="main-uploader").find('a')["href"]
-        return Channel(url=f"https://xvideos.com/channels{link}", core=self.core)
+        if not link.startswith("/profiles"):
+            return Channel(url=f"https://xvideos.com/channels{link}", core=self.core)
+
+        else:
+            return Channel(url=f"https://xvideos.com{link}", core=self.core)
 
     @cached_property
     def length(self) -> str:
@@ -256,9 +260,9 @@ class Channel:
     def __init__(self, url: str, core: Optional[BaseCore], auto_init=True):
         self.core = core
         self.logger = setup_logger(name="XVIDEOS API - [Channel]", log_file=None, level=logging.ERROR)
-        if not "/channels/" in url:
+        if "/channels/" not in url and "profiles" not in url:
             self.logger.warning("/channels/ not in URL. Trying to fix manually. This CAN lead to more errors!")
-            self.url = url.replace("xvideos.com/", "xvideos.com/channels/")
+            self.url = url.replace("xvideos.com/", "xvideos.com/channels")
 
         else:
             self.url = url
@@ -343,7 +347,11 @@ class Channel:
         names = self.bs4_about_me.find(id="pinfo-workedfor").find_all('a')
         links = [a['href'] for a in names]
         for link in links:
-            return Channel(core=self.core, url=f"https://www.xvideos.com{link}")
+            if not "profile" in link:
+                return Channel(url=f"https://xvideos.com/channels{link}", core=self.core)
+
+            else:
+                return Channel(url=f"https://xvideos.com{link}", core=self.core)
 
 
 class Pornstar:
@@ -511,7 +519,6 @@ class Client:
             urls_ = Client.extract_video_urls(response)
 
             for url in urls_:
-                print(f"URL: {url}")
                 url = f"https://www.xvideos.com{url}"
 
                 if REGEX_VIDEO_CHECK_URL.match(url):
