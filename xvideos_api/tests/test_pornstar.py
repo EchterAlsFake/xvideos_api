@@ -8,7 +8,7 @@ def test_pornstar():
     assert isinstance(pornstar.total_videos, int)
     assert isinstance(pornstar.total_pages, int)
 
-    for idx, video in enumerate(pornstar.videos):
+    for idx, video in enumerate(pornstar.videos()):
         assert isinstance(video.title, str) and len(video.title) >= 3
         if idx == 3:
             break

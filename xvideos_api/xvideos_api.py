@@ -27,6 +27,8 @@ from functools import cached_property
 from typing import Union, Generator, Optional
 from base_api.base import BaseCore, setup_logger
 from base_api.modules.config import RuntimeConfig
+from concurrent.futures import as_completed, ThreadPoolExecutor
+
 
 try:
     from modules.consts import *
@@ -37,6 +39,56 @@ except (ModuleNotFoundError, ImportError):
     from .modules.consts import *
     from .modules.errors import *
     from .modules.sorting import *
+
+
+class ErrorVideo:
+    """Drop-in-ish stand-in that raises when accessed."""
+    def __init__(self, url: str, err: Exception):
+        self.url = url
+        self._err = err
+
+    def __getattr__(self, _):
+        # Any attribute access surfaces the original error
+        raise self._err
+
+
+class Helper:
+    def __init__(self, core: BaseCore):
+        super(Helper).__init__()
+        self.core = core
+
+    def _get_video(self, url: str):
+        return Video(url, core=self.core)
+
+    def _make_video_safe(self, url: str):
+        try:
+            return Video(url, core=self.core)
+        except Exception as e:
+            return ErrorVideo(url, e)
+
+    def iterator(self, pages: int = 0, max_workers: int = 20):
+        if pages == 0:
+            pages = 99
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for idx in range(0, pages):
+                video_urls = []
+                if not self.url.endswith("/"):
+                    self.url = f"{self.url}/"
+
+                url_dynamic_javascript = self.core.fetch(f"{self.url}videos/best/{idx}")
+                data = json.loads(url_dynamic_javascript)
+                u_values = [video["u"] for video in data["videos"]]
+
+                for video in u_values:
+                    url = str(video).split("/")
+                    id = url[4]
+                    part_two = url[5]
+                    video_urls.append(f"https://www.xvideos.com/video.{id}/{part_two}")
+
+                futures = [executor.submit(self._make_video_safe, url) for url in video_urls]
+                for fut in as_completed(futures):
+                    yield fut.result()
 
 
 class Video:
@@ -250,7 +302,7 @@ class Video:
         return self.json_data["contentUrl"]
 
 
-class Channel:
+class Channel(Helper):
     """
     Returns the Channel object for a Channel. Please note, that the Channel object and the Pornstar object
     are almost identical, but I still differentiated them as two different classes, because TECHNICALLY they are
@@ -258,6 +310,7 @@ class Channel:
 
     """
     def __init__(self, url: str, core: Optional[BaseCore], auto_init=True):
+        super().__init__(core=core)
         self.core = core
         self.logger = setup_logger(name="XVIDEOS API - [Channel]", log_file=None, level=logging.ERROR)
         if "/channels/" not in url and "profiles" not in url:
@@ -295,24 +348,9 @@ class Channel:
     def total_pages(self):
         return math.ceil(self.total_videos / self.per_page)
 
-    @cached_property
-    def videos(self):
-        self.logger.debug(f"Pornstar has: {self.total_pages} pages...")
-        for idx in range(0, self.total_pages):
-            self.logger.debug(f"Iterating for page: {idx}")
-
-            if not self.url.endswith("/"):
-                self.url = f"{self.url}/"
-
-            url_dynamic_javascript = self.core.fetch(f"{self.url}videos/best/{idx}")
-            data = json.loads(url_dynamic_javascript)
-
-            u_values = [video["u"] for video in data["videos"]]
-            for video in u_values:
-                url = str(video).split("/")
-                id = url[4]
-                part_two = url[5]
-                yield Video(f"https://www.xvideos.com/video.{id}/{part_two}", core=self.core)
+    def videos(self, pages: int = 0, max_workers: int = 20):
+        self.logger.debug(f"Channel has: {self.total_pages} pages...")
+        yield from self.iterator(pages=pages, max_workers=max_workers)
 
     @cached_property
     def country(self) -> str:
@@ -354,8 +392,9 @@ class Channel:
                 return Channel(url=f"https://xvideos.com{link}", core=self.core)
 
 
-class Pornstar:
+class Pornstar(Helper):
     def __init__(self, url: str, core: Optional[BaseCore]):
+        super().__init__(core=core)
         self.core = core
         self.url = self.check_url(url)
         base_content = self.core.fetch(f"{self.url}/videos/best/0")
@@ -395,19 +434,9 @@ class Pornstar:
     def total_pages(self):
         return math.ceil(self.total_videos / self.per_page)
 
-    @cached_property
-    def videos(self):
-        for idx in range(0, self.total_pages):
-            self.logger.debug(f"Iterating for page: {idx}")
-            url_dynamic_javascript = self.core.fetch(f"{self.url}/videos/best/{idx}")
-            data = json.loads(url_dynamic_javascript)
-
-            u_values = [video["u"] for video in data["videos"]]
-            for video in u_values:
-                url = str(video).split("/")
-                id = url[4]
-                part_two = url[5]
-                yield Video(f"https://www.xvideos.com/video.{id}/{part_two}", core=self.core)
+    def videos(self, pages: int = 0, max_workers: int = 20):
+        self.logger.debug(f"Pornstar has: {self.total_pages} pages...")
+        yield from self.iterator(pages=pages, max_workers=max_workers)
 
     @cached_property
     def gender(self) -> str:
@@ -468,8 +497,9 @@ class Pornstar:
             yield Channel(core=self.core, url=f"https://www.xvideos.com{link}")
 
 
-class Client:
+class Client(Helper):
     def __init__(self, core: Optional[BaseCore] = None):
+        super().__init__(core)
         self.core = core or BaseCore(config=RuntimeConfig())
         self.core.initialize_session(headers)
         self.logger = setup_logger(name="XVIDEOS API - [Client]", log_file=None, level=logging.ERROR)
@@ -506,23 +536,28 @@ class Client:
                sorting_date: Union[str, SortDate] = SortDate.Sort_all,
                sorting_time: Union[str, SortVideoTime] = SortVideoTime.Sort_all,
                sort_quality: Union[str, SortQuality] = SortQuality.Sort_all,
-               pages=5) -> Generator[Video, None, None]:
+               pages: int = 5, max_workers: int = 20) -> Generator[Video, None, None]:
 
         query = query.replace(" ", "+")
         self.logger.info(f"Replaced query to: {query}")
         base_url = f"https://www.xvideos.com/?k={query}&sort={sorting_sort}%&datef={sorting_date}&durf={sorting_time}&quality={sort_quality}"
         self.logger.debug(f"Requesting with base url: {base_url}")
 
-        for page in range(pages):
-            self.logger.debug(f"Iterating for page: {page}")
-            response = self.core.fetch(f"{base_url}&p={page}")
-            urls_ = Client.extract_video_urls(response)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for page in range(pages):
+                self.logger.debug(f"Iterating for page: {page}")
+                response = self.core.fetch(f"{base_url}&p={page}")
+                video_urls = []
+                urls_ = Client.extract_video_urls(response)
 
-            for url in urls_:
-                url = f"https://www.xvideos.com{url}"
+                for url in urls_:
+                    url = f"https://www.xvideos.com{url}"
+                    if "video." in url:
+                        video_urls.append(url)
 
-                if REGEX_VIDEO_CHECK_URL.match(url):
-                    yield Video(url, core=self.core)
+                futures = [executor.submit(self._make_video_safe, url) for url in video_urls]
+                for fut in as_completed(futures):
+                    yield fut.result()
 
     def get_pornstar(self, url) -> Pornstar:
         return Pornstar(url, core=self.core)

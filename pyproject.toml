@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "xvideos_api"
-version = "1.6.5"
+version = "1.6.6"
 description = "A Python API for the Porn Site xvideos.com"
 readme = "README.md"
 requires-python = ">=3.6"
