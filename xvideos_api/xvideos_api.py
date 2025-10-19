@@ -22,8 +22,8 @@ import httpx
 import logging
 import argparse
 
-from bs4 import BeautifulSoup
 from functools import cached_property
+from bs4 import BeautifulSoup, SoupStrainer
 from typing import Union, Generator, Optional
 from base_api.base import BaseCore, setup_logger
 from base_api.modules.config import RuntimeConfig
@@ -67,26 +67,31 @@ class Helper:
             return ErrorVideo(url, e)
 
     def iterator(self, pages: int = 0, max_workers: int = 20):
-        if pages == 0:
-            pages = 99
+        pages = pages or 99
+        base = self.url if self.url.endswith("/") else f"{self.url}/"
+        page_urls = [f"{base}videos/best/{i}" for i in range(pages)]
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            for idx in range(0, pages):
+        with ThreadPoolExecutor(max_workers=max_workers) as ex:
+            # Fetch page JSON concurrently
+            page_bodies = ex.map(self.core.fetch, page_urls)
+
+            for body in page_bodies:
+                try:
+                    data = json.loads(body)
+                except Exception:
+                    continue
                 video_urls = []
-                if not self.url.endswith("/"):
-                    self.url = f"{self.url}/"
+                for u in (v.get("u") for v in data.get("videos", [])):
+                    if not u:
+                        continue
+                    parts = str(u).split("/")
+                    if len(parts) >= 6:
+                        vid = parts[4]
+                        slug = parts[5]
+                        video_urls.append(f"https://www.xvideos.com/video.{vid}/{slug}")
 
-                url_dynamic_javascript = self.core.fetch(f"{self.url}videos/best/{idx}")
-                data = json.loads(url_dynamic_javascript)
-                u_values = [video["u"] for video in data["videos"]]
-
-                for video in u_values:
-                    url = str(video).split("/")
-                    id = url[4]
-                    part_two = url[5]
-                    video_urls.append(f"https://www.xvideos.com/video.{id}/{part_two}")
-
-                futures = [executor.submit(self._make_video_safe, url) for url in video_urls]
+                # Fetch video pages concurrently
+                futures = [ex.submit(self._make_video_safe, u) for u in video_urls]
                 for fut in as_completed(futures):
                     yield fut.result()
 
@@ -106,13 +111,38 @@ class Video:
             if self.html_content.status_code == 404:
                 raise VideoUnavailable("The video is not available or the URL is incorrect.")
 
-        self.json_data = self.flatten_json(nested_json=self.extract_json_from_html())
-        self.script_content = self.get_script_content()
+        self.json_data = self.meta
         self.quality_url_map = None
         self.available_qualities = None
 
     def enable_logging(self, log_file: str = None, level = None, log_ip: str = None, log_port: int = None):
         self.logger = setup_logger(name="XVIDEOS API - [Video]", log_file=log_file, level=level, http_ip=log_ip, http_port=log_port)
+
+    @cached_property
+    def html_text(self) -> str:
+        r = self.core.fetch(self.url)
+        if isinstance(r, httpx.Response):
+            if r.status_code == 404:
+                raise VideoUnavailable("The video is not available or the URL is incorrect.")
+            return r.text
+        return r  # assume already a string
+
+    @cached_property
+    def soup(self) -> BeautifulSoup:
+        # lxml is much faster than the default parser
+        return BeautifulSoup(self.html_text, "lxml")
+
+    @cached_property
+    def script_content(self) -> str:
+        # Find the one script we care about without reparsing
+        def desired(tag):
+            if tag.name != "script" or not tag.string:
+                return False
+            t = tag.string
+            return ("html5player" in t) and ("setVideoTitle" in t) and ("setVideoUrlLow" in t)
+
+        s = self.soup.find(desired)
+        return s.string if s and s.string else ""
 
     @classmethod
     def check_url(cls, url) -> str:
@@ -127,51 +157,34 @@ class Video:
         else:
             raise InvalidUrl(f"Invalid Video URL: {url}")
 
-    @classmethod
-    def is_desired_script(cls, tag):
-        if tag.name != "script":
-            return False
-        script_contents = ['html5player', 'setVideoTitle', 'setVideoUrlLow']
-        return all(content in tag.text for content in script_contents)
-
-    def get_script_content(self):
-        soup = BeautifulSoup(self.html_content, features="html.parser")
-        target_script = soup.find(self.is_desired_script)
-        return target_script.text
+    @cached_property
+    def json_data(self) -> dict:
+        data = {}
+        for s in self.soup.select('script[type="application/ld+json"]'):
+            if not s.string:
+                continue
+            try:
+                # or orjson.loads(s.string)
+                data.update(json.loads(s.string))
+            except Exception:
+                continue
+        return data
 
     def get_html_content(self) -> Union[str, httpx.Response]:
         return self.core.fetch(self.url)
 
-    def extract_json_from_html(self):
-        soup = BeautifulSoup(self.html_content, features="html.parser")
-        script_tags = soup.find_all('script', {'type': 'application/ld+json'})
-
-        combined_data = {}
-
-        for script in script_tags:
-            json_text = script.string.strip()
-            data = json.loads(json_text)
-            combined_data.update(data)
-        cleaned_dictionary = self.flatten_json(combined_data)
-        return cleaned_dictionary
-
-    def flatten_json(self, nested_json, parent_key='', sep='_'):
-        """
-        Flatten a nested json dictionary. Duplicate keys will be overridden.
-
-        :param nested_json: The nested JSON dictionary to be flattened.
-        :param parent_key: The base key to use for the flattened keys.
-        :param sep: The separator between nested keys.
-        :return: A flattened dictionary.
-        """
-        items = []
-        for k, v in nested_json.items():
-            new_key = f"{parent_key}{sep}{k}" if parent_key else k
-            if isinstance(v, dict):
-                items.extend(self.flatten_json(v, new_key, sep=sep).items())
-            else:
-                items.append((new_key, v))
-        return dict(items)
+    @cached_property
+    def meta(self) -> dict:
+        j = self.json_data
+        # Defensive access because JSON-LD varies
+        return {
+            "name": j.get("name"),
+            "description": j.get("description"),
+            "thumbnailUrl": (j.get("thumbnailUrl") or [None])[0] if isinstance(j.get("thumbnailUrl"), list) else j.get(
+                "thumbnailUrl"),
+            "uploadDate": j.get("uploadDate"),
+            "contentUrl": j.get("contentUrl"),
+        }
 
     def get_segments(self, quality) -> list:
         """
@@ -211,7 +224,7 @@ class Video:
 
     @cached_property
     def title(self) -> str:
-        return html.unescape(self.json_data["name"])
+        return html.unescape(self.meta["name"]) if self.meta["name"] else ""
 
     @cached_property
     def description(self) -> str:
@@ -407,7 +420,7 @@ class Pornstar(Helper):
         self.logger = setup_logger(name="XVIDEOS API - [Pornstar]", log_file=log_file, level=level, http_ip=log_ip, http_port=log_port)
 
     def check_url(self, url):
-        if not "/pornstars/" and not "/model/" in url:
+        if ("/pornstars/" not in url) and ("/model/" not in url):
             self.logger.error("URL doesn't contain '/pornstars/', seems like a channel URL or is generally invalid!")
             raise InvalidPornstar(
                 "It seems like the Pornstar URL is invalid, please note, that channels are NOT supported!")
@@ -514,23 +527,20 @@ class Client(Helper):
         """
         return Video(url, core=self.core)
 
+    def _fetch_many(self, urls, executor):
+        # Reuse the same HTTP client; BaseCore.fetch should be thread-safe
+        return list(executor.map(self.core.fetch, urls))
+
     @classmethod
     def extract_video_urls(cls, html_content: str) -> list:
-        # Parse the HTML content with BeautifulSoup
-        soup = BeautifulSoup(html_content, features="html.parser")
-        video_urls = []
-
-        # Find all 'div' elements with the class 'thumb'
-        thumb_divs = soup.find_all('div', class_='thumb')
-
-        # Iterate over each 'thumb' div and extract the 'href' attribute from the 'a' tag within it
-        for div in thumb_divs:
-            a_tag = div.find('a', href=True)  # Find the first 'a' tag with an 'href' attribute
-            if a_tag and a_tag['href']:  # Ensure the 'a' tag and its 'href' attribute exist
-                video_urls.append(a_tag['href'])
-
-        return video_urls
-
+        strainer = SoupStrainer('div', class_='thumb')  # parse only these nodes
+        soup = BeautifulSoup(html_content, 'lxml', parse_only=strainer)
+        out = []
+        for div in soup.find_all('div', class_='thumb'):
+            a_tag = div.find('a', href=True)
+            if a_tag and a_tag['href']:
+                out.append(a_tag['href'])
+        return out
 
     def search(self, query: str, sorting_sort: Union[str, Sort.Sort_relevance] = Sort.Sort_relevance,
                sorting_date: Union[str, SortDate] = SortDate.Sort_all,
@@ -539,23 +549,19 @@ class Client(Helper):
                pages: int = 5, max_workers: int = 20) -> Generator[Video, None, None]:
 
         query = query.replace(" ", "+")
-        self.logger.info(f"Replaced query to: {query}")
         base_url = f"https://www.xvideos.com/?k={query}&sort={sorting_sort}%&datef={sorting_date}&durf={sorting_time}&quality={sort_quality}"
-        self.logger.debug(f"Requesting with base url: {base_url}")
+        self.logger.info(f"Searching with: {base_url}")
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            for page in range(pages):
-                self.logger.debug(f"Iterating for page: {page}")
-                response = self.core.fetch(f"{base_url}&p={page}")
-                video_urls = []
-                urls_ = Client.extract_video_urls(response)
+        with ThreadPoolExecutor(max_workers=max_workers) as ex:
+            page_urls = [f"{base_url}&p={p}" for p in range(pages)]
+            page_htmls = self._fetch_many(page_urls, ex)  # fetch pages in parallel
 
-                for url in urls_:
-                    url = f"https://www.xvideos.com{url}"
-                    if "video." in url:
-                        video_urls.append(url)
+            # Now extract video URLs and fetch their pages in parallel too
+            for page_html in page_htmls:
+                video_paths = self.extract_video_urls(page_html)  # cheap parse (see #3)
+                video_urls = [f"https://www.xvideos.com{u}" for u in video_paths if "video." in u]
 
-                futures = [executor.submit(self._make_video_safe, url) for url in video_urls]
+                futures = [ex.submit(self._make_video_safe, u) for u in video_urls]
                 for fut in as_completed(futures):
                     yield fut.result()
 
