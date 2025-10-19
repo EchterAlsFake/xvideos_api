@@ -315,7 +315,7 @@ class Channel(Helper):
         self.logger = setup_logger(name="XVIDEOS API - [Channel]", log_file=None, level=logging.ERROR)
         if "/channels/" not in url and "profiles" not in url:
             self.logger.warning("/channels/ not in URL. Trying to fix manually. This CAN lead to more errors!")
-            self.url = url.replace("xvideos.com/", "xvideos.com/channels")
+            self.url = url.replace("xvideos.com/", "xvideos.com/channels/")
 
         else:
             self.url = url
@@ -556,6 +556,23 @@ class Client(Helper):
                         video_urls.append(url)
 
                 futures = [executor.submit(self._make_video_safe, url) for url in video_urls]
+                for fut in as_completed(futures):
+                    yield fut.result()
+
+    def get_playlist(self, url: str, max_workers: int = 20, pages: int = 2) -> Generator[Video, None, None]:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for page in range(pages):
+                self.logger.debug(f"Iterating for page: {page}")
+                response = self.core.fetch(f"{url}/{page}")
+                video_urls = []
+                urls_ = Client.extract_video_urls(response)
+
+                for _url in urls_:
+                    _url = f"https://www.xvideos.com{_url}"
+                    if "video." in _url:
+                        video_urls.append(_url)
+
+                futures = [executor.submit(self._make_video_safe, _url) for _url in video_urls]
                 for fut in as_completed(futures):
                     yield fut.result()
 
