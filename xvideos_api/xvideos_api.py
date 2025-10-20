@@ -17,18 +17,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import os
 import math
 import html
-import json
 import httpx
 import logging
 import argparse
 
+from itertools import islice
 from functools import cached_property
-from bs4 import BeautifulSoup, SoupStrainer
-from typing import Union, Generator, Optional
-from base_api.base import BaseCore, setup_logger
 from base_api.modules.config import RuntimeConfig
-from concurrent.futures import as_completed, ThreadPoolExecutor
-
+from base_api.base import BaseCore, setup_logger, ErrorVideo
+from typing import Union, Generator, Optional, List, Callable
+from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 
 try:
     from modules.consts import *
@@ -40,22 +39,25 @@ except (ModuleNotFoundError, ImportError):
     from .modules.errors import *
     from .modules.sorting import *
 
-
-class ErrorVideo:
-    """Drop-in-ish stand-in that raises when accessed."""
-    def __init__(self, url: str, err: Exception):
-        self.url = url
-        self._err = err
-
-    def __getattr__(self, _):
-        # Any attribute access surfaces the original error
-        raise self._err
+"""page_urls = [urljoin(self.url, f"videos/best/{i}") for i in range(pages)]"""
 
 
 class Helper:
     def __init__(self, core: BaseCore):
-        super(Helper).__init__()
+        super().__init__()
         self.core = core
+
+    @staticmethod
+    def chunked(iterable, size):
+        """
+        This function is used to limit page fetching, so that not all pages are fetched at once.
+        """
+        it = iter(iterable)
+        while True:
+            block = list(islice(it, size))
+            if not block:
+                return
+            yield block
 
     def _get_video(self, url: str):
         return Video(url, core=self.core)
@@ -66,35 +68,105 @@ class Helper:
         except Exception as e:
             return ErrorVideo(url, e)
 
-    def iterator(self, pages: int = 0, max_workers: int = 20):
-        pages = pages or 99
-        base = self.url if self.url.endswith("/") else f"{self.url}/"
-        page_urls = [f"{base}videos/best/{i}" for i in range(pages)]
+    def iterator(self, page_urls: List[str] = None, extractor: Callable = None,
+                 pages_concurrency: int = 5, videos_concurrency: int = 20):
 
-        with ThreadPoolExecutor(max_workers=max_workers) as ex:
-            # Fetch page JSON concurrently
-            page_bodies = ex.map(self.core.fetch, page_urls)
+        # Results: (page_idx, vid_idx) -> Video/ErrorVideo
+        results = {}
+        # Count of videos for each site (known after extractor) needed to map videos to their sequence number (to keep them in order)
+        page_counts = {}
 
-            for body in page_bodies:
-                try:
-                    data = json.loads(body)
-                except Exception:
+        # Tracks the Index of videos, because we need to keep them in the correct order while fetching in parallel
+        next_page_idx = 0
+        next_video_idx = 0
+
+        def flush_ready():
+            nonlocal next_page_idx, next_video_idx # Make the variables accessible from above
+
+            while True:
+                # Stop if we don't know the video count of the next page yet
+                if next_page_idx not in page_counts:
+                    return
+
+                # If the site is finished, move on to the next one (keep the page workers always working)
+                if next_video_idx >= page_counts[next_page_idx]:
+                    next_page_idx += 1
+                    next_video_idx = 0
                     continue
-                video_urls = []
-                for u in (v.get("u") for v in data.get("videos", [])):
-                    if not u:
-                        continue
-                    parts = str(u).split("/")
-                    if len(parts) >= 6:
-                        vid = parts[4]
-                        slug = parts[5]
-                        video_urls.append(f"https://www.xvideos.com/video.{vid}/{slug}")
 
-                # Fetch video pages concurrently
-                futures = [ex.submit(self._make_video_safe, u) for u in video_urls]
-                for fut in as_completed(futures):
-                    yield fut.result()
+                key = (next_page_idx, next_video_idx)
+                if key not in results:
+                    return
 
+                yield results.pop(key)
+                next_video_idx += 1
+
+        page_iter = iter(enumerate(page_urls))
+
+        with ThreadPoolExecutor(max_workers=pages_concurrency) as page_executor, \
+             ThreadPoolExecutor(max_workers=videos_concurrency) as video_executor:
+
+            # In-Flight-Maps
+            page_in_flight = {}   # future -> (page_idx, url)
+            video_in_flight = {}  # future -> (page_idx, vid_idx)
+
+            # Get URLs of pages and their index to start fetching
+            for _ in range(pages_concurrency):
+                try:
+                    pidx, url = next(page_iter)
+                    print(f"Fetching: {pidx}: {url}")
+
+                except StopIteration:
+                    break
+
+                page_in_flight[page_executor.submit(self.core.fetch, url)] = (pidx, url)
+                # These are the results of the fetched pages
+
+            while page_in_flight or video_in_flight:
+                # Waiting for a finished site or a video
+                waiting_on = set(page_in_flight.keys()) | set(video_in_flight.keys())
+                done, _ = wait(waiting_on, return_when=FIRST_COMPLETED)
+
+                for fut in done:
+                    # A site is finished, now extracting the videos
+                    if fut in page_in_flight:
+                        pidx, url = page_in_flight.pop(fut)
+                        html = fut.result() # Get the HTML content
+
+                        # Extract the video URLs from the extractor
+                        video_urls = extractor(html)
+                        print(f"Got {len(video_urls)} videos for: {url}")
+                        # Keep track fo the total count of videos in the current site
+                        page_counts[pidx] = len(video_urls)
+
+                        # Start getting Video objects in parallel, but with the index and URL to keep the correct order
+                        for vid_idx, vurl in enumerate(video_urls):
+                            vf = video_executor.submit(self._make_video_safe, vurl)
+                            video_in_flight[vf] = (pidx, vid_idx)
+
+                        # After start the jobs above, we can already try flushing
+                        yield from flush_ready()
+
+                        # A site is finished, so we fetch the next one
+                        try:
+                            npidx, nurl = next(page_iter)
+                            page_in_flight[page_executor.submit(self.core.fetch, nurl)] = (npidx, nurl)
+                        except StopIteration:
+                            pass
+
+                    # A video is finished, so we save it in the results to flush (return) it later
+                    elif fut in video_in_flight:
+                        pidx, vid_idx = video_in_flight.pop(fut)
+                        try:
+                            results[(pidx, vid_idx)] = fut.result()
+                        except Exception as e:
+                            results[(pidx, vid_idx)] = ErrorVideo(f"<unknown:{pidx}/{vid_idx}>", e)
+
+                        # return the things that are finished
+                        yield from flush_ready()
+
+            # clear anything left (shouldn't happen)
+            yield from flush_ready()
 
 class Video:
     def __init__(self, url, core: Optional[BaseCore] = None):
@@ -105,8 +177,7 @@ class Video:
         self.url = self.check_url(url)
         self.logger = setup_logger(name="XVIDEOS API - [Video]", log_file=None, level=logging.ERROR)
         self.html_content = self.get_html_content()
-        self.soup = BeautifulSoup(self.html_content, 'html.parser')
-
+        self.soup = BeautifulSoup(self.html_content, 'lxml')
         if isinstance(self.html_content, httpx.Response):
             if self.html_content.status_code == 404:
                 raise VideoUnavailable("The video is not available or the URL is incorrect.")
@@ -164,7 +235,6 @@ class Video:
             if not s.string:
                 continue
             try:
-                # or orjson.loads(s.string)
                 data.update(json.loads(s.string))
             except Exception:
                 continue
@@ -335,7 +405,7 @@ class Channel(Helper):
 
         base_content = self.core.fetch(f"{self.url}/videos/best/0")
         about_me_html = self.core.fetch(f"{self.url}#_tabAboutMe")
-        self.bs4_about_me = BeautifulSoup(about_me_html, "html.parser")
+        self.bs4_about_me = BeautifulSoup(about_me_html, "lxml")
         self.data = json.loads(base_content)
 
     def enable_logging(self, name="XVIDEOS API - [Channel]", log_file=None, level=logging.DEBUG, log_ip: str = None, log_port: int = None):
@@ -363,7 +433,8 @@ class Channel(Helper):
 
     def videos(self, pages: int = 0, max_workers: int = 20):
         self.logger.debug(f"Channel has: {self.total_pages} pages...")
-        yield from self.iterator(pages=pages, max_workers=max_workers)
+
+        yield from self.iterator(max_workers=max_workers)
 
     @cached_property
     def country(self) -> str:
@@ -412,7 +483,7 @@ class Pornstar(Helper):
         self.url = self.check_url(url)
         base_content = self.core.fetch(f"{self.url}/videos/best/0")
         about_me_html = self.core.fetch(f"{self.url}#_tabAboutMe")
-        self.bs4_about_me = BeautifulSoup(about_me_html, "html.parser")
+        self.bs4_about_me = BeautifulSoup(about_me_html, "lxml")
         self.data = json.loads(base_content)
         self.logger = setup_logger(name="XVIDEOS API - [Pornstar]", log_file=None, level=logging.ERROR)
 
@@ -514,7 +585,7 @@ class Client(Helper):
     def __init__(self, core: Optional[BaseCore] = None):
         super().__init__(core)
         self.core = core or BaseCore(config=RuntimeConfig())
-        self.core.initialize_session(headers)
+        self.core.initialize_session()
         self.logger = setup_logger(name="XVIDEOS API - [Client]", log_file=None, level=logging.ERROR)
 
     def enable_logging(self, log_file: str = None, level=None, log_ip: str = None, log_port: int = None):
@@ -527,60 +598,45 @@ class Client(Helper):
         """
         return Video(url, core=self.core)
 
-    def _fetch_many(self, urls, executor):
-        # Reuse the same HTTP client; BaseCore.fetch should be thread-safe
-        return list(executor.map(self.core.fetch, urls))
-
-    @classmethod
-    def extract_video_urls(cls, html_content: str) -> list:
-        strainer = SoupStrainer('div', class_='thumb')  # parse only these nodes
-        soup = BeautifulSoup(html_content, 'lxml', parse_only=strainer)
-        out = []
-        for div in soup.find_all('div', class_='thumb'):
-            a_tag = div.find('a', href=True)
-            if a_tag and a_tag['href']:
-                out.append(a_tag['href'])
-        return out
-
     def search(self, query: str, sorting_sort: Union[str, Sort.Sort_relevance] = Sort.Sort_relevance,
                sorting_date: Union[str, SortDate] = SortDate.Sort_all,
                sorting_time: Union[str, SortVideoTime] = SortVideoTime.Sort_all,
                sort_quality: Union[str, SortQuality] = SortQuality.Sort_all,
-               pages: int = 5, max_workers: int = 20) -> Generator[Video, None, None]:
+               pages: int = 30, videos_concurrency: int = 20,
+               pages_concurrency: int = 5) -> Generator[Video, None, None]:
 
         query = query.replace(" ", "+")
-        base_url = f"https://www.xvideos.com/?k={query}&sort={sorting_sort}%&datef={sorting_date}&durf={sorting_time}&quality={sort_quality}"
-        self.logger.info(f"Searching with: {base_url}")
+        p = urlparse(f"https://www.xvideos.com/")
+        qs = parse_qs(p.query)
+        queries = {
+            "k": query,
+            "sort": sorting_sort,
+            "datef": sorting_date,
+            "durf": sorting_time,
+            "quality": sort_quality
+        }
 
-        with ThreadPoolExecutor(max_workers=max_workers) as ex:
-            page_urls = [f"{base_url}&p={p}" for p in range(pages)]
-            page_htmls = self._fetch_many(page_urls, ex)  # fetch pages in parallel
+        for key, value in queries.items():
+            if value:
+                qs[key] = [str(value)]
 
-            # Now extract video URLs and fetch their pages in parallel too
-            for page_html in page_htmls:
-                video_paths = self.extract_video_urls(page_html)  # cheap parse (see #3)
-                video_urls = [f"https://www.xvideos.com{u}" for u in video_paths if "video." in u]
+        new_query = urlencode(qs, doseq=True)
+        url = urlunparse(p._replace(query=new_query))
 
-                futures = [ex.submit(self._make_video_safe, u) for u in video_urls]
-                for fut in as_completed(futures):
-                    yield fut.result()
+        page_urls = [f"{url}&p={p}" for p in range(pages)]
+        yield from self.iterator(page_urls=page_urls, extractor=extractor_html, videos_concurrency=videos_concurrency,
+                                 pages_concurrency=pages_concurrency)
 
-    def get_playlist(self, url: str, max_workers: int = 20, pages: int = 2) -> Generator[Video, None, None]:
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            for page in range(pages):
-                self.logger.debug(f"Iterating for page: {page}")
-                response = self.core.fetch(f"{url}/{page}")
-                video_urls = []
-                urls_ = Client.extract_video_urls(response)
 
-                for _url in urls_:
-                    _url = f"https://www.xvideos.com{_url}"
-                    if "video." in _url:
-                        video_urls.append(_url)
+    def get_playlist(self, url: str, pages: int = 10, videos_concurrency: int = 20,
+                     pages_concurrency: int = 5) -> Generator[Video, None, None]:
+        page_urls = []
 
-                futures = [executor.submit(self._make_video_safe, _url) for _url in video_urls]
-                for fut in as_completed(futures):
-                    yield fut.result()
+        for page in range(pages):
+            page_urls.append(f"{url}/{page}")
+
+        yield from self.iterator(page_urls=page_urls, extractor=extractor_html, videos_concurrency=videos_concurrency,
+                                 pages_concurrency=pages_concurrency)
 
     def get_pornstar(self, url) -> Pornstar:
         return Pornstar(url, core=self.core)
@@ -624,4 +680,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    playlist = Client().get_playlist(f"https://de.xvideos.com/favorite/37186029/everything", pages=200, pages_concurrency=5)
+    for video in playlist:
+        print(video.title)
