@@ -301,7 +301,11 @@ class Channel(Helper):
         return math.ceil(self.total_videos / self.per_page)
 
     def videos(self, pages: int = 0, videos_concurrency: int = 5, pages_concurrency: int = 2) -> Generator[Video, None, None]:
-        page_urls = [f"{self.url}/videos/best/{i}" for i in range(pages, self.total_pages)] # Don't exceed total available pages
+        if pages > self.total_pages:
+            self.logger.warning(f"You want to fetch: {self.total_pages} pages but only: {self.total_pages} are available. Reducing!")
+            pages = self.total_pages
+
+        page_urls = [f"{self.url}/videos/best/{i}" for i in range(pages)] # Don't exceed total available pages
         self.logger.debug(f"Processing: {len(page_urls)} pages...")
         yield from self.iterator(page_urls=page_urls, videos_concurrency=videos_concurrency, pages_concurrency=pages_concurrency,
                                  extractor=extractor_json)
@@ -389,7 +393,12 @@ class Pornstar(Helper):
         return math.ceil(self.total_videos / self.per_page)
 
     def videos(self, pages: int = 0, videos_concurrency: int = 5, pages_concurrency: int = 2) -> Generator[Video, None, None]:
-        page_urls = [f"{self.url}/videos/best/{i}" for i in range(pages, self.total_pages)] # Don't exceed total available pages
+        if pages > self.total_pages:
+            self.logger.warning(
+                f"You want to fetch: {self.total_pages} pages but only: {self.total_pages} are available. Reducing!")
+            pages = self.total_pages
+
+        page_urls = [f"{self.url}/videos/best/{i}" for i in range(pages)]  # Don't exceed total available pages
         self.logger.debug(f"Processing: {len(page_urls)} pages...")
         yield from self.iterator(page_urls=page_urls, videos_concurrency=videos_concurrency, pages_concurrency=pages_concurrency,
                                  extractor=extractor_json)
