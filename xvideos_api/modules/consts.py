@@ -1,8 +1,10 @@
 import re
 import json
 
-from bs4 import SoupStrainer, BeautifulSoup
+from typing import List
 from urllib.parse import urljoin
+from bs4 import SoupStrainer, BeautifulSoup
+
 
 REGEX_VIDEO_CHECK_URL = re.compile(r'(.*?)xvideos.com/video(.*?)')
 REGEX_VIDEO_M3U8 = re.compile(r"html5player\.setVideoHLS\('([^']+)'\);")
@@ -14,7 +16,7 @@ headers = {
 }
 
 
-def extractor_json(html: str):
+def extractor_json(html: str) -> List[str]:
     """
     Extracts the video URLs from a HTML. This function needs to be given to the iterator function
     in the Helper class. See BaseCore (eaf_base_api)
@@ -34,8 +36,10 @@ def extractor_json(html: str):
             slug = parts[5]
             video_urls.append(f"https://www.xvideos.com/video.{vid}/{slug}")
 
+    return video_urls
 
-def extractor_html(html: str) -> list:
+
+def extractor_html(html: str) -> List[str]:
     strainer = SoupStrainer('div', class_='thumb')  # parse only these nodes
     soup = BeautifulSoup(html, 'lxml', parse_only=strainer)
     out = []
