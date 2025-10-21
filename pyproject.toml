@@ -16,6 +16,8 @@ dependencies = [
     "bs4",
     "eaf_base_api",
     "httpx",
+    "lxml",
+    "h2"
 ]
 optional-dependencies = {av = ["av"], ffmpeg = ["ffmpeg-progress-yield"]}
 classifiers = [
