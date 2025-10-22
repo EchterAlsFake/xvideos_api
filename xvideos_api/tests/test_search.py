@@ -64,12 +64,12 @@ def test_sort_quality_search(quality_option):
 ])
 def test_sort_date_search(date_option):
     """Test sorting by different SortDate options."""
-    videos = client.search(query, sorting_date=date_option)
+    videos = client.search(query, sorting_date=date_option, videos_concurrency=1, pages_concurrency=1)
     validate_video_objects(videos)
 
 def test_base_search():
     """Test basic search functionality."""
-    videos = client.search(query)
+    videos = client.search(query, videos_concurrency=1, pages_concurrency=1)
     validate_video_objects(videos)
 
 # Refactored by ChatGPT lol
