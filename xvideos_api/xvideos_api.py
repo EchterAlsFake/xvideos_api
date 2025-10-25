@@ -300,13 +300,15 @@ class Channel(Helper):
     def total_pages(self):
         return math.ceil(self.total_videos / self.per_page)
 
-    def videos(self, pages: int = 0, videos_concurrency: int = 5, pages_concurrency: int = 2) -> Generator[Video, None, None]:
+    def videos(self, pages: int = 0, videos_concurrency: int = None, pages_concurrency: int = None) -> Generator[Video, None, None]:
         if pages > self.total_pages:
             self.logger.warning(f"You want to fetch: {self.total_pages} pages but only: {self.total_pages} are available. Reducing!")
             pages = self.total_pages
 
         page_urls = [f"{self.url}/videos/best/{i}" for i in range(pages)] # Don't exceed total available pages
         self.logger.debug(f"Processing: {len(page_urls)} pages...")
+        videos_concurrency = videos_concurrency or self.core.config.videos_concurrency
+        pages_concurrency = pages_concurrency or self.core.config.pages_concurrency
         yield from self.iterator(page_urls=page_urls, videos_concurrency=videos_concurrency, pages_concurrency=pages_concurrency,
                                  extractor=extractor_json)
 
@@ -392,7 +394,7 @@ class Pornstar(Helper):
     def total_pages(self):
         return math.ceil(self.total_videos / self.per_page)
 
-    def videos(self, pages: int = 0, videos_concurrency: int = 5, pages_concurrency: int = 2) -> Generator[Video, None, None]:
+    def videos(self, pages: int = 0, videos_concurrency: int = None, pages_concurrency: int = None) -> Generator[Video, None, None]:
         if pages > self.total_pages:
             self.logger.warning(
                 f"You want to fetch: {self.total_pages} pages but only: {self.total_pages} are available. Reducing!")
@@ -400,6 +402,8 @@ class Pornstar(Helper):
 
         page_urls = [f"{self.url}/videos/best/{i}" for i in range(pages)]  # Don't exceed total available pages
         self.logger.debug(f"Processing: {len(page_urls)} pages...")
+        videos_concurrency = videos_concurrency or self.core.config.videos_concurrency
+        pages_concurrency = pages_concurrency or self.core.config.pages_concurrency
         yield from self.iterator(page_urls=page_urls, videos_concurrency=videos_concurrency, pages_concurrency=pages_concurrency,
                                  extractor=extractor_json)
 
@@ -484,8 +488,8 @@ class Client(Helper):
                sorting_date: Union[str, SortDate] = SortDate.Sort_all,
                sorting_time: Union[str, SortVideoTime] = SortVideoTime.Sort_all,
                sort_quality: Union[str, SortQuality] = SortQuality.Sort_all,
-               pages: int = 2, videos_concurrency: int = 5,
-               pages_concurrency: int = 2) -> Generator[Video, None, None]:
+               pages: int = 2, videos_concurrency: int = None,
+               pages_concurrency: int = None) -> Generator[Video, None, None]:
 
         query = query.replace(" ", "+")
         p = urlparse(f"https://www.xvideos.com/")
@@ -504,19 +508,23 @@ class Client(Helper):
 
         new_query = urlencode(qs, doseq=True)
         url = urlunparse(p._replace(query=new_query))
-
         page_urls = [f"{url}&p={p}" for p in range(pages)]
+        videos_concurrency = videos_concurrency or self.core.config.videos_concurrency
+        pages_concurrency = pages_concurrency or self.core.config.pages_concurrency
+
         yield from self.iterator(page_urls=page_urls, extractor=extractor_html, videos_concurrency=videos_concurrency,
                                  pages_concurrency=pages_concurrency)
 
 
-    def get_playlist(self, url: str, pages: int = 2, videos_concurrency: int = 5,
-                     pages_concurrency: int = 2) -> Generator[Video, None, None]:
+    def get_playlist(self, url: str, pages: int = 2, videos_concurrency: int = None,
+                     pages_concurrency: int = None) -> Generator[Video, None, None]:
         page_urls = [f"{url}/{page}" for page in range(pages)]
 
         for page in range(pages):
             page_urls.append(f"{url}/{page}")
 
+        videos_concurrency = videos_concurrency or self.core.config.videos_concurrency
+        pages_concurrency = pages_concurrency or self.core.config.pages_concurrency
         yield from self.iterator(page_urls=page_urls, extractor=extractor_html, videos_concurrency=videos_concurrency,
                                  pages_concurrency=pages_concurrency)
 
