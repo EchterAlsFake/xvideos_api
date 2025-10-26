@@ -172,7 +172,7 @@ class Video:
 
     @cached_property
     def thumbnail_url(self) -> str:
-        return html.unescape(self.json_data["thumbnailUrl"])[0]
+        return self.json_data["thumbnailUrl"]
 
     @cached_property
     def preview_video_url(self) -> str:
