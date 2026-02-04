@@ -1,14 +1,15 @@
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["uv_build>=0.9.18,<0.10.0"]
+build-backend = "uv_build"
 
 [project]
 name = "xvideos_api"
-version = "1.8.1"
+version = "1.8.2"
 description = "A Python API for the Porn Site xvideos.com"
-readme = "README.md"
-requires-python = ">=3.6"
-license = { text = "LGPLv3" }
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.9"
+license = "LGPL-3.0-only"
+license-files = ["LICENSE"]
 authors = [
     { name = "Johannes Habel", email = "EchterAlsFake@proton.me" }
 ]
@@ -16,14 +17,14 @@ dependencies = [
     "bs4",
     "eaf_base_api",
     "httpx",
-    "lxml",
-    "h2"
 ]
-optional-dependencies = {av = ["av"], ffmpeg = ["ffmpeg-progress-yield"]}
 classifiers = [
-    "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
     "Programming Language :: Python",
 ]
+
+[project.optional-dependencies]
+av = ["av; python_version >= '3.10'"]
+full = ["lxml", "h2", "socks5"] # H2 for HTTP 2.0 support, LXML for faster parsing speed, though optional :)
 
 [project.urls]
 Homepage = "https://github.com/EchterAlsFake/xvideos_api"
@@ -31,5 +32,6 @@ Homepage = "https://github.com/EchterAlsFake/xvideos_api"
 [project.scripts]
 xvideos_api = "xvideos_api.xvideos_api:main"
 
-[tool.setuptools]
-packages = { find = {} }
+[tool.uv.build-backend]
+module-name = "xvideos_api"
+module-root = ""

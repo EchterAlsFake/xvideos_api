@@ -23,9 +23,15 @@ import argparse
 
 from functools import cached_property
 from typing import Union, Generator, Optional
-from base_api.modules.config import RuntimeConfig
 from base_api.base import BaseCore, setup_logger, Helper
 from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
+
+try:
+    import lxml
+    parser = "lxml" # Faster speeds, but more dependencies
+
+except (ModuleNotFoundError, ImportError):
+    parser = "html.parser" # Fallback to classic HTML parser (will work fine)
 
 try:
     from modules.consts import *
@@ -47,7 +53,7 @@ class Video:
         self.url = self.check_url(url)
         self.logger = setup_logger(name="XVIDEOS API - [Video]", log_file=None, level=logging.ERROR)
         self.html_content = self.get_html_content()
-        self.soup = BeautifulSoup(self.html_content, 'lxml')
+        self.soup = BeautifulSoup(self.html_content, parser)
         if isinstance(self.html_content, httpx.Response):
             if self.html_content.status_code == 404:
                 raise VideoUnavailable("The video is not available or the URL is incorrect.")
@@ -71,7 +77,7 @@ class Video:
     @cached_property
     def soup(self) -> BeautifulSoup:
         # lxml is much faster than the default parser
-        return BeautifulSoup(self.html_text, "lxml")
+        return BeautifulSoup(self.html_text, parser)
 
     @cached_property
     def script_content(self) -> str:
@@ -274,7 +280,7 @@ class Channel(Helper):
 
         base_content = self.core.fetch(f"{self.url}/videos/best/0")
         about_me_html = self.core.fetch(f"{self.url}#_tabAboutMe")
-        self.bs4_about_me = BeautifulSoup(about_me_html, "lxml")
+        self.bs4_about_me = BeautifulSoup(about_me_html, parser)
         self.data = json.loads(base_content)
 
     def enable_logging(self, name="XVIDEOS API - [Channel]", log_file=None, level=logging.DEBUG, log_ip: str = None, log_port: int = None):
@@ -470,7 +476,7 @@ class Pornstar(Helper):
 class Client(Helper):
     def __init__(self, core: Optional[BaseCore] = None):
         super().__init__(core, video=Video)
-        self.core = core or BaseCore(config=RuntimeConfig())
+        self.core = core or BaseCore()
         self.core.initialize_session()
         self.logger = setup_logger(name="XVIDEOS API - [Client]", log_file=None, level=logging.ERROR)
 
