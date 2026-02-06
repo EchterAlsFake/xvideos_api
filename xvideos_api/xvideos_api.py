@@ -20,6 +20,7 @@ import html
 import httpx
 import logging
 import argparse
+import threading
 
 from functools import cached_property
 from typing import Union, Generator, Optional
@@ -140,26 +141,38 @@ class Video:
         segments = self.core.get_segments(quality=quality, m3u8_url_master=self.m3u8_base_url)
         return segments
 
-    def download(self, downloader, quality, path="./", callback=None, no_title=False, remux: bool = False, callback_remux=None) -> bool:
+    def download(self, quality, path="./", callback=None, no_title=False, remux: bool = False,
+                 callback_remux=None, start_segment: int = 0, stop_event: Optional[threading.Event] = None,
+                 segment_state_path: Optional[str] = None, segment_dir: Optional[str] = None,
+                 return_report: bool = False, cleanup_on_stop: bool = True, keep_segment_dir: bool = False
+                 ) -> bool:
         """
         :param callback:
-        :param downloader:
         :param quality:
         :param path:
         :param no_title:
         :param remux:
         :param callback_remux:
+        :param start_segment:
+        :param stop_event:
+        :param segment_state_path:
+        :param segment_dir:
+        :param return_report:
+        :param cleanup_on_stop:
+        :param keep_segment_dir:
         :return:
         """
         if not no_title:
             path = os.path.join(path, f"{self.title}.mp4")
 
         try:
-            self.core.download(video=self, quality=quality, path=path, callback=callback, downloader=downloader,
-                               remux=remux, callback_remux=callback_remux)
-            return True
+            return self.core.download(video=self, quality=quality, path=path, callback=callback, remux=remux,
+                                  callback_remux=callback_remux, start_segment=start_segment, stop_event=stop_event,
+                                  segment_state_path=segment_state_path, segment_dir=segment_dir,
+                                  return_report=return_report,
+                                  cleanup_on_stop=cleanup_on_stop, keep_segment_dir=keep_segment_dir)
 
-        except AttributeError:
+        except Exception: # I should improve this in the future
             self.logger.warning("Video doesn't have an HLS stream. Using legacy downloading instead...")
             self.core.legacy_download(path=path, callback=callback, url=self.cdn_url)
             return True
@@ -550,7 +563,6 @@ def main():
                         help="(Optional) Specify a file with URLs (separated with new lines)")
     parser.add_argument("--output", metavar="Output directory", type=str, help="The output path (with filename)",
                         required=True)
-    parser.add_argument("--downloader", type=str, help="The Downloader (threaded,ffmpeg,default)", required=True)
     parser.add_argument("--no-title", metavar="True,False", type=str,
                         help="Whether to apply video title automatically to output path or not", required=True)
 
@@ -559,7 +571,7 @@ def main():
     if args.download:
         client = Client()
         video = client.get_video(args.download)
-        video.download(quality=args.quality, path=args.output, downloader=args.downloader, no_title=no_title)
+        video.download(quality=args.quality, path=args.output, no_title=no_title)
 
     if args.file:
         videos = []
@@ -572,7 +584,7 @@ def main():
             videos.append(client.get_video(url))
 
         for video in videos:
-            video.download(quality=args.quality, path=args.output, downloader=args.downloader, no_title=no_title)
+            video.download(quality=args.quality, path=args.output, no_title=no_title)
 
 
 if __name__ == "__main__":

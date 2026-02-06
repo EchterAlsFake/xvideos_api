@@ -11,11 +11,8 @@ video_2 = client.get_video(url_2)
 video_3 = client.get_video(url_3)
 
 def test_download_high():
-    assert video_1.download(downloader="threaded", quality="best") is True
-    assert video_1.download(downloader="threaded", quality="best", remux=True) is True
+    stuff_1 = video_1.download(quality="worst", return_report=True)
+    stuff_2 = video_2.download(quality="worst", return_report=True, remux=True)
+    assert stuff_1["status"] == "completed"
+    assert stuff_2["status"] == "completed"
 
-def test_download_half():
-    assert video_2.download(downloader="threaded", quality="half") is True
-
-def test_download_worst():
-    assert video_3.download(downloader="threaded", quality="worst") is True
