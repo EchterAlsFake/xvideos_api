@@ -324,6 +324,9 @@ class Channel(Helper):
             self.logger.warning(f"You want to fetch: {self.total_pages} pages but only: {self.total_pages} are available. Reducing!")
             pages = self.total_pages
 
+        if pages == 0:
+            pages = self.total_pages
+
         page_urls = [f"{self.url}/videos/best/{i}" for i in range(pages)] # Don't exceed total available pages
         self.logger.debug(f"Processing: {len(page_urls)} pages...")
         videos_concurrency = videos_concurrency or self.core.config.videos_concurrency
@@ -386,7 +389,7 @@ class Pornstar(Helper):
         self.logger = setup_logger(name="XVIDEOS API - [Pornstar]", log_file=log_file, level=level, http_ip=log_ip, http_port=log_port)
 
     def check_url(self, url):
-        if ("/pornstars/" not in url) and ("/model/" not in url):
+        if ("/pornstars" not in url) and ("/model" not in url):
             self.logger.error("URL doesn't contain '/pornstars/', seems like a channel URL or is generally invalid!")
             raise InvalidPornstar(
                 "It seems like the Pornstar URL is invalid, please note, that channels are NOT supported!")
@@ -417,6 +420,9 @@ class Pornstar(Helper):
         if pages > self.total_pages:
             self.logger.warning(
                 f"You want to fetch: {self.total_pages} pages but only: {self.total_pages} are available. Reducing!")
+            pages = self.total_pages
+
+        if pages == 0:
             pages = self.total_pages
 
         page_urls = [f"{self.url}/videos/best/{i}" for i in range(pages)]  # Don't exceed total available pages
