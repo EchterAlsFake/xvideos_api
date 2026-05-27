@@ -1,10 +1,16 @@
+import pytest
 from ..xvideos_api import Client, Channel
 
 url = "https://de.xvideos.com/video.ohplvhk02fd/meine_lesbische_freundin_hat_mich_beim_fremdgehen_mit_einem_zufalligen_typen_erwischt_aber_ich_kann_nicht_aufhoren_und_ficke_ihn_weiter_vor_ihren_augen_"
 # This URL will be used for all tests
 
 client = Client()
-video = client.get_video(url)
+video = None
+
+@pytest.mark.asyncio
+async def test_get_video():
+    global video
+    video = await client.get_video(url)
 
 
 def test_title():
