@@ -48,6 +48,69 @@ except (ModuleNotFoundError, ImportError):
     from .modules.sorting import *
 
 
+class Account(Helper):
+    def __init__(self, cookies: dict = cookies, core: Optional[BaseCore] = None):
+        super().__init__(core=core, video=Video)
+        self.core = core
+        self.cookies = cookies
+
+        if not self.cookies:
+            raise NoLoginCookies("""
+You have not provided any login cookies. Please set them in the consts module like:
+
+consts.cookies = {
+session_token = <token>
+session_token_auth = <token>
+            }            
+            """)
+
+        self.core.session.cookies.update(cookies)
+        self.core.session.headers.update(headers)
+        self.logger = setup_logger(name="XVIDEOS API - [Account]", log_file=None, level=logging.ERROR)
+
+
+    async def get_recommended_videos(self, pages: int = 2, videos_concurrency: int = None,
+                                     pages_concurrency: int = None) -> AsyncGenerator[Video, None]:
+
+        page_urls = [f"https://www.xvideos.com/history/{page}" for page in range(pages)]
+        videos_concurrency = videos_concurrency or self.core.config.videos_concurrency
+        pages_concurrency = pages_concurrency or self.core.config.pages_concurrency
+
+        async for video in self.iterator(page_urls=page_urls, extractor=extractor_account,
+                                         videos_concurrency=videos_concurrency,
+                                         pages_concurrency=pages_concurrency,
+                                         method_pages="POST"):
+
+            yield await video.init()
+
+    async def get_liked_videos(self, pages: int = 2, videos_concurrency: int = None,
+                                     pages_concurrency: int = None) -> AsyncGenerator[Video, None]:
+
+        page_urls = [f"https://www.xvideos.com/videos-i-like/{page}" for page in range(pages)]
+        videos_concurrency = videos_concurrency or self.core.config.videos_concurrency
+        pages_concurrency = pages_concurrency or self.core.config.pages_concurrency
+
+        async for video in self.iterator(page_urls=page_urls, extractor=extractor_account,
+                                         videos_concurrency=videos_concurrency,
+                                         pages_concurrency=pages_concurrency,
+                                         method_pages="POST"):
+            yield await video.init()
+
+    async def get_watch_later_videos(self, pages: int = 2, videos_concurrency: int = None,
+                                     pages_concurrency: int = None) -> AsyncGenerator[Video, None]:
+
+        page_urls = [f"https://www.xvideos.com/watch-later/{page}" for page in range(pages)]
+        videos_concurrency = videos_concurrency or self.core.config.videos_concurrency
+        pages_concurrency = pages_concurrency or self.core.config.pages_concurrency
+
+        async for video in self.iterator(page_urls=page_urls, extractor=extractor_account,
+                                         videos_concurrency=videos_concurrency,
+                                         pages_concurrency=pages_concurrency,
+                                         method_pages="POST"):
+            yield await video.init()
+
+
+
 class Video:
     def __init__(self, url, core: Optional[BaseCore] = None, html_content=None):
         """
@@ -63,7 +126,7 @@ class Video:
         self.json_data = {}
         self.quality_url_map = None
         self.available_qualities = None
-        
+
     async def init(self):
         if not self.html_content:
             self.html_content = await self.get_html_content()
@@ -574,6 +637,10 @@ class Client(Helper):
         channel = Channel(url, core=self.core)
         return await channel.init()
 
+    def get_account(self) -> Account:
+        account = Account(core=self.core)
+        return account
+
 
 async def run_main():
     parser = argparse.ArgumentParser(description="API Command Line Interface")
@@ -608,8 +675,5 @@ async def run_main():
             await video.download(quality=args.quality, path=args.output, no_title=no_title)
 
 
-def main():
-    asyncio.run(main_2())
-
 if __name__ == "__main__":
-    main()
+    asyncio.run(run_main())

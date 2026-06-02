@@ -11,3 +11,8 @@ class VideoUnavailable(Exception):
 class InvalidPornstar(Exception):
     def __init__(self, msg):
         self.msg = msg
+
+
+class NoLoginCookies(Exception):
+    def __init__(self, msg):
+        self.msg = msg

@@ -21,6 +21,7 @@
 - Fetch Pornstars
 - Search for videos
 - Fetch playlists
+- Account login (Fetch Liked, watched and recommended videos)
 - Asynchronous
 - Built-in caching
 - Easy interface

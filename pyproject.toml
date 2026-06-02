@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "xvideos_api"
-version = "2.0"
+version = "2.1"
 description = "A Python API for the Porn Site xvideos.com"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
@@ -36,3 +36,6 @@ xvideos_api = "xvideos_api.xvideos_api:main"
 [tool.uv.build-backend]
 module-name = "xvideos_api"
 module-root = ""
+
+[tool.uv.sources]
+eaf_base_api = {path="/home/asuna/PycharmProjects/eaf_base_api"}
