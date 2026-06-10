@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "xvideos_api"
-version = "2.1"
+version = "2.2"
 description = "A Python API for the Porn Site xvideos.com"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
@@ -16,7 +16,6 @@ authors = [
 dependencies = [
     "bs4",
     "eaf_base_api",
-    "lxml>=6.1.1",
     "m3u8"
 ]
 classifiers = [

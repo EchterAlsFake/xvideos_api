@@ -64,7 +64,7 @@ def extractor_json(html: str) -> List[str]:
 
 def extractor_html(html: str) -> List[str]:
     strainer = SoupStrainer('div', class_='thumb')  # parse only these nodes
-    soup = BeautifulSoup(html, 'lxml', parse_only=strainer)
+    soup = BeautifulSoup(html, parser, parse_only=strainer)
     out = []
     for div in soup.find_all('div', class_='thumb'):
         a_tag = div.find('a', href=True)

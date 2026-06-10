@@ -1,4 +1,4 @@
-from ..xvideos_api import Client, Sort, SortVideoTime, SortQuality, SortDate, VideoUnavailable
+from ..xvideos_api import Client, Sort, SortVideoTime, SortQuality, SortDate, NotFound
 import pytest
 
 # Initialize query
@@ -19,7 +19,7 @@ async def validate_video_objects(videos):
             if idx == 3:  # Validate up to 4 videos for brevity
                 break
 
-        except VideoUnavailable:
+        except NotFound:
             break # Expected
             
         idx += 1

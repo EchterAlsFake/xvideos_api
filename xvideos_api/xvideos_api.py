@@ -25,10 +25,13 @@ import traceback
 
 
 from functools import cached_property
-from curl_cffi.requests import Response
-from typing import Union, Generator, Optional, AsyncGenerator
-from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
+from typing import Generator, AsyncGenerator
+from base_api.modules.type_hints import DownloadReport
+from curl_cffi.requests import Response, AsyncSession
 from base_api.base import BaseCore, setup_logger, Helper
+from base_api.modules.static_functions import str_to_bool
+from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
+from base_api.modules.errors import InvalidProxy, BotProtectionDetected, UnknownError,NetworkingError
 
 try:
     import lxml
@@ -41,16 +44,42 @@ try:
     from modules.consts import *
     from modules.errors import *
     from modules.sorting import *
+    from modules.type_hints import *
 
 except (ModuleNotFoundError, ImportError):
     from .modules.consts import *
     from .modules.errors import *
     from .modules.sorting import *
+    from .modules.type_hints import *
+
+
+async def get_html_content(core: BaseCore, url: str) -> str | None | dict:
+    # What should I do here?
+    try:
+        content = await core.fetch(url)
+        if isinstance(content, str):
+            return content
+
+        if isinstance(content, Response):
+            if content.status_code == 404:
+                raise NotFound(f"Server returned 404 for: {url}")
+
+    except NetworkingError as e:
+        raise NetworkError(str(e)) from e
+
+    except InvalidProxy as e:
+        raise ProxyError(str(e)) from e
+
+    except BotProtectionDetected as e:
+        raise BotDetection(str(e)) from e
+
+    except UnknownError as e:
+        raise UnknownNetworkError(str(e)) from e
 
 
 class Account(Helper):
-    def __init__(self, cookies: dict = cookies, core: Optional[BaseCore] = None):
-        super().__init__(core=core, video=Video)
+    def __init__(self, core: BaseCore, cookies: dict | None = cookies):
+        super().__init__(core=core, video_constructor=Video)
         self.core = core
         self.cookies = cookies
 
@@ -64,55 +93,58 @@ session_token_auth = <token>
             }            
             """)
 
+        assert isinstance(self.core.session, AsyncSession)
         self.core.session.cookies.update(cookies)
         self.core.session.headers.update(headers)
         self.logger = setup_logger(name="XVIDEOS API - [Account]", log_file=None, level=logging.ERROR)
 
 
-    async def get_recommended_videos(self, pages: int = 2, videos_concurrency: int = None,
-                                     pages_concurrency: int = None) -> AsyncGenerator[Video, None]:
+    async def get_recommended_videos(self, pages: int = 2, videos_concurrency: int | None = None,
+                                     pages_concurrency: int | None = None) -> AsyncGenerator[Video, None]:
 
         page_urls = [f"https://www.xvideos.com/history/{page}" for page in range(pages)]
-        videos_concurrency = videos_concurrency or self.core.config.videos_concurrency
-        pages_concurrency = pages_concurrency or self.core.config.pages_concurrency
+        videos_concurrency = videos_concurrency or self.core.configuration.videos_concurrency
+        pages_concurrency = pages_concurrency or self.core.configuration.pages_concurrency
+        assert videos_concurrency and pages_concurrency
 
-        async for video in self.iterator(page_urls=page_urls, extractor=extractor_account,
-                                         videos_concurrency=videos_concurrency,
-                                         pages_concurrency=pages_concurrency,
-                                         method_pages="POST"):
+        async for video in self.iterator(target_page_urls=page_urls, video_link_extractor=extractor_account,
+                                         max_video_concurrency=videos_concurrency,
+                                         max_page_concurrency=pages_concurrency,
+                                         page_request_method="POST"):
 
             yield await video.init()
 
-    async def get_liked_videos(self, pages: int = 2, videos_concurrency: int = None,
-                                     pages_concurrency: int = None) -> AsyncGenerator[Video, None]:
+    async def get_liked_videos(self, pages: int = 2, videos_concurrency: int | None = None,
+                                     pages_concurrency: int | None = None) -> AsyncGenerator[Video, None]:
 
         page_urls = [f"https://www.xvideos.com/videos-i-like/{page}" for page in range(pages)]
-        videos_concurrency = videos_concurrency or self.core.config.videos_concurrency
-        pages_concurrency = pages_concurrency or self.core.config.pages_concurrency
+        videos_concurrency = videos_concurrency or self.core.configuration.videos_concurrency
+        pages_concurrency = pages_concurrency or self.core.configuration.pages_concurrency
+        assert videos_concurrency and pages_concurrency
+        async for video in self.iterator(target_page_urls=page_urls, video_link_extractor=extractor_account,
+                                         max_video_concurrency=videos_concurrency,
+                                         max_page_concurrency=pages_concurrency,
+                                         page_request_method="POST"):
 
-        async for video in self.iterator(page_urls=page_urls, extractor=extractor_account,
-                                         videos_concurrency=videos_concurrency,
-                                         pages_concurrency=pages_concurrency,
-                                         method_pages="POST"):
             yield await video.init()
-
-    async def get_watch_later_videos(self, pages: int = 2, videos_concurrency: int = None,
-                                     pages_concurrency: int = None) -> AsyncGenerator[Video, None]:
+    async def get_watch_later_videos(self, pages: int = 2, videos_concurrency: int | None = None,
+                                     pages_concurrency: int | None = None) -> AsyncGenerator[Video, None]:
 
         page_urls = [f"https://www.xvideos.com/watch-later/{page}" for page in range(pages)]
-        videos_concurrency = videos_concurrency or self.core.config.videos_concurrency
-        pages_concurrency = pages_concurrency or self.core.config.pages_concurrency
+        videos_concurrency = videos_concurrency or self.core.configuration.videos_concurrency
+        pages_concurrency = pages_concurrency or self.core.configuration.pages_concurrency
+        assert videos_concurrency and pages_concurrency
+        async for video in self.iterator(target_page_urls=page_urls, video_link_extractor=extractor_account,
+                                         max_video_concurrency=videos_concurrency,
+                                         max_page_concurrency=pages_concurrency,
+                                         page_request_method="POST"):
 
-        async for video in self.iterator(page_urls=page_urls, extractor=extractor_account,
-                                         videos_concurrency=videos_concurrency,
-                                         pages_concurrency=pages_concurrency,
-                                         method_pages="POST"):
             yield await video.init()
 
 
 
 class Video:
-    def __init__(self, url, core: Optional[BaseCore] = None, html_content=None):
+    def __init__(self, url, core: BaseCore, html_content=None):
         """
         :param url: (str) The URL of the video
         """
@@ -121,30 +153,31 @@ class Video:
         self.logger = setup_logger(name="XVIDEOS API - [Video]", log_file=None, level=logging.ERROR)
         self.html_content = html_content
         self._soup = None
-        if self.html_content:
-            self._soup = BeautifulSoup(self.html_content, parser)
         self.json_data = {}
         self.quality_url_map = None
         self.available_qualities = None
 
     async def init(self):
         if not self.html_content:
-            self.html_content = await self.get_html_content()
-            self._soup = BeautifulSoup(self.html_content, parser)
-        
-        if isinstance(self.html_content, Response):
-            if self.html_content.status_code == 404:
-                raise VideoUnavailable("The video is not available or the URL is incorrect.")
-        
+            self.html_content = await get_html_content(core=self.core, url=self.url)
+
+        assert isinstance(self.html_content, str)
+        self._soup = BeautifulSoup(self.html_content, parser)
         self.json_data = self.meta
         return self
 
-    def enable_logging(self, log_file: str = None, level = None, log_ip: str = None, log_port: int = None):
+    def enable_logging(self, log_file: str | None = None, level: int | None = None, log_ip: str | None = None, log_port: int | None = None):
+        if not level:
+            level = logging.DEBUG
+
         self.logger = setup_logger(name="XVIDEOS API - [Video]", log_file=log_file, level=level, http_ip=log_ip, http_port=log_port)
 
     @property
     def soup(self) -> BeautifulSoup:
         # lxml is much faster than the default parser
+        if not self._soup:
+            raise ValueError("You probably forgot to call init")
+
         return self._soup
 
     @cached_property
@@ -183,9 +216,6 @@ class Video:
                 continue
         return data
 
-    async def get_html_content(self) -> Union[str, Response]:
-        return await self.core.fetch(self.url)
-
     @property
     def meta(self) -> dict:
         j = self._get_json_data()
@@ -207,11 +237,11 @@ class Video:
         segments = await self.core.get_segments(quality=quality, m3u8_url_master=self.m3u8_base_url)
         return segments
 
-    async def download(self, quality, path="./", callback=None, no_title=False, remux: bool = False,
-                 callback_remux=None, start_segment: int = 0, stop_event: Optional[threading.Event] = None,
-                 segment_state_path: Optional[str] = None, segment_dir: Optional[str] = None,
+    async def download(self, quality, path="./", callback: callback_hint = None, no_title=False, remux: bool = False,
+                 callback_remux=None, start_segment: int = 0, stop_event: threading.Event | None = None,
+                 segment_state_path: str | None = None, segment_dir: str | None = None,
                  return_report: bool = False, cleanup_on_stop: bool = True, keep_segment_dir: bool = False
-                 ) -> bool:
+                 ) -> bool | DownloadReport:
         """
         :param callback:
         :param quality:
@@ -349,8 +379,8 @@ class Channel(Helper):
     different things.
 
     """
-    def __init__(self, url: str, core: Optional[BaseCore], auto_init=True):
-        super().__init__(core=core, video=Video)
+    def __init__(self, url: str, core: BaseCore):
+        super().__init__(core=core, video_constructor=Video)
         self.core = core
         self.logger = setup_logger(name="XVIDEOS API - [Channel]", log_file=None, level=logging.ERROR)
         if "/channels/" not in url and "profiles" not in url:
@@ -362,14 +392,20 @@ class Channel(Helper):
         self.data = None
 
     async def init(self):
-        base_content = await self.core.fetch(f"{self.url}/videos/best/0")
-        about_me_html = await self.core.fetch(f"{self.url}#_tabAboutMe")
+        base_content = await get_html_content(url=f"{self.url}/videos/best/0", core=self.core)
+        about_me_html = await get_html_content(url=f"{self.url}#_tabAboutMe", core=self.core)
+
+        assert isinstance(about_me_html, str)
+        assert isinstance(base_content, str)
         self.bs4_about_me = BeautifulSoup(about_me_html, parser)
         self.data = json.loads(base_content)
         return self
 
-    def enable_logging(self, name="XVIDEOS API - [Channel]", log_file=None, level=logging.DEBUG, log_ip: str = None, log_port: int = None):
-        self.logger = setup_logger(name=name, log_file=log_file, level=level, http_ip=log_ip, http_port=log_port)
+    def enable_logging(self, log_file: str | None = None, level: int | None = None, log_ip: str | None = None,
+                       log_port: int | None = None):
+        if not level:
+            level = logging.DEBUG
+        self.logger = setup_logger(name="XVIDEOS API - [Channel]", log_file=log_file, level=level, http_ip=log_ip, http_port=log_port)
 
     @cached_property
     def name(self) -> str:
@@ -391,7 +427,7 @@ class Channel(Helper):
     def total_pages(self):
         return math.ceil(self.total_videos / self.per_page)
 
-    async def videos(self, pages: int = 0, videos_concurrency: int = None, pages_concurrency: int = None) -> AsyncGenerator[Video, None]:
+    async def videos(self, pages: int = 0, videos_concurrency: int | None = None, pages_concurrency: int | None = None) -> AsyncGenerator[Video, None]:
         if pages > self.total_pages:
             self.logger.warning(f"You want to fetch: {self.total_pages} pages but only: {self.total_pages} are available. Reducing!")
             pages = self.total_pages
@@ -401,11 +437,14 @@ class Channel(Helper):
 
         page_urls = [f"{self.url}/videos/best/{i}" for i in range(pages)] # Don't exceed total available pages
         self.logger.debug(f"Processing: {len(page_urls)} pages...")
-        videos_concurrency = videos_concurrency or self.core.config.videos_concurrency
-        pages_concurrency = pages_concurrency or self.core.config.pages_concurrency
-        
-        async for video in self.iterator(page_urls=page_urls, videos_concurrency=videos_concurrency, pages_concurrency=pages_concurrency, extractor=extractor_json):
-             yield await video.init()
+        videos_concurrency = videos_concurrency or self.core.configuration.videos_concurrency
+        pages_concurrency = pages_concurrency or self.core.configuration.pages_concurrency
+        assert videos_concurrency and pages_concurrency
+        async for video in self.iterator(target_page_urls=page_urls, video_link_extractor=extractor_account,
+                                         max_video_concurrency=videos_concurrency,
+                                         max_page_concurrency=pages_concurrency):
+
+            yield await video.init()
 
     @cached_property
     def country(self) -> str:
@@ -448,8 +487,8 @@ class Channel(Helper):
 
 
 class Pornstar(Helper):
-    def __init__(self, url: str, core: Optional[BaseCore]):
-        super().__init__(core=core, video=Video)
+    def __init__(self, core: BaseCore, url: str):
+        super().__init__(core=core, video_constructor=Video)
         self.core = core
         self.url = self.check_url(url)
         self.bs4_about_me = None
@@ -457,13 +496,19 @@ class Pornstar(Helper):
         self.logger = setup_logger(name="XVIDEOS API - [Pornstar]", log_file=None, level=logging.ERROR)
         
     async def init(self):
-        base_content = await self.core.fetch(f"{self.url}/videos/best/0")
-        about_me_html = await self.core.fetch(f"{self.url}#_tabAboutMe")
-        self.bs4_about_me = BeautifulSoup(about_me_html, "lxml")
+        base_content = await get_html_content(url=f"{self.url}/videos/best/0", core=self.core)
+        about_me_html = await get_html_content(url=f"{self.url}#_tabAboutMe", core=self.core)
+
+        assert isinstance(about_me_html, str)
+        assert isinstance(base_content, str)
+        self.bs4_about_me = BeautifulSoup(about_me_html, parser)
         self.data = json.loads(base_content)
         return self
 
-    def enable_logging(self, log_file: str = None, level=None, log_ip: str = None, log_port: int = None):
+    def enable_logging(self, log_file: str | None = None, level: int | None = None, log_ip: str | None = None,
+                       log_port: int | None = None):
+        if not level:
+            level = logging.DEBUG
         self.logger = setup_logger(name="XVIDEOS API - [Pornstar]", log_file=log_file, level=level, http_ip=log_ip, http_port=log_port)
 
     def check_url(self, url):
@@ -494,7 +539,7 @@ class Pornstar(Helper):
     def total_pages(self):
         return math.ceil(self.total_videos / self.per_page)
 
-    async def videos(self, pages: int = 0, videos_concurrency: int = None, pages_concurrency: int = None) -> AsyncGenerator[Video, None]:
+    async def videos(self, pages: int = 0, videos_concurrency: int | None = None, pages_concurrency: int | None = None) -> AsyncGenerator[Video, None]:
         if pages > self.total_pages:
             self.logger.warning(
                 f"You want to fetch: {self.total_pages} pages but only: {self.total_pages} are available. Reducing!")
@@ -505,10 +550,14 @@ class Pornstar(Helper):
 
         page_urls = [f"{self.url}/videos/best/{i}" for i in range(pages)]  # Don't exceed total available pages
         self.logger.debug(f"Processing: {len(page_urls)} pages...")
-        videos_concurrency = videos_concurrency or self.core.config.videos_concurrency
-        pages_concurrency = pages_concurrency or self.core.config.pages_concurrency
-        
-        async for video in self.iterator(page_urls=page_urls, videos_concurrency=videos_concurrency, pages_concurrency=pages_concurrency, extractor=extractor_json):
+        videos_concurrency = videos_concurrency or self.core.configuration.videos_concurrency
+        pages_concurrency = pages_concurrency or self.core.configuration.pages_concurrency
+        assert videos_concurrency and pages_concurrency
+
+        async for video in self.iterator(target_page_urls=page_urls, video_link_extractor=extractor_account,
+                                         max_video_concurrency=videos_concurrency,
+                                         max_page_concurrency=pages_concurrency):
+
             yield await video.init()
 
 
@@ -572,13 +621,16 @@ class Pornstar(Helper):
 
 
 class Client(Helper):
-    def __init__(self, core: Optional[BaseCore] = None):
-        super().__init__(core, video=Video)
-        self.core = core or BaseCore()
+    def __init__(self, core: BaseCore = BaseCore()):
+        super().__init__(core, video_constructor=Video)
+        self.core = core
         self.core.initialize_session()
         self.logger = setup_logger(name="XVIDEOS API - [Client]", log_file=None, level=logging.ERROR)
 
-    def enable_logging(self, log_file: str = None, level=None, log_ip: str = None, log_port: int = None):
+    def enable_logging(self, log_file: str | None = None, level: int | None = None, log_ip: str | None = None,
+                       log_port: int | None = None):
+        if not level:
+            level = logging.DEBUG
         self.logger = setup_logger(name="XVIDEOS API - [Client]", log_file=log_file, level=level, http_ip=log_ip, http_port=log_port)
 
     async def get_video(self, url: str) -> Video:
@@ -589,12 +641,12 @@ class Client(Helper):
         video = Video(url, core=self.core)
         return await video.init()
 
-    async def search(self, query: str, sorting_sort: Union[str, Sort.Sort_relevance] = Sort.Sort_relevance,
-               sorting_date: Union[str, SortDate] = SortDate.Sort_all,
-               sorting_time: Union[str, SortVideoTime] = SortVideoTime.Sort_all,
-               sort_quality: Union[str, SortQuality] = SortQuality.Sort_all,
-               pages: int = 2, videos_concurrency: int = None,
-               pages_concurrency: int = None) -> AsyncGenerator[Video, None]:
+    async def search(self, query: str, sorting_sort: str | Sort = Sort.Sort_relevance,
+               sorting_date: str | SortDate = SortDate.Sort_all,
+               sorting_time: str | SortVideoTime = SortVideoTime.Sort_all,
+               sort_quality: str | SortQuality = SortQuality.Sort_all,
+               pages: int = 2, videos_concurrency: int | None = None,
+               pages_concurrency: int | None = None) -> AsyncGenerator[Video, None]:
 
         query = query.replace(" ", "+")
         p = urlparse(f"https://www.xvideos.com/")
@@ -614,23 +666,30 @@ class Client(Helper):
         new_query = urlencode(qs, doseq=True)
         url = urlunparse(p._replace(query=new_query))
         page_urls = [f"{url}&p={p}" for p in range(pages)]
-        videos_concurrency = videos_concurrency or self.core.config.videos_concurrency
-        pages_concurrency = pages_concurrency or self.core.config.pages_concurrency
-        
-        async for video in self.iterator(page_urls=page_urls, videos_concurrency=videos_concurrency, pages_concurrency=pages_concurrency, extractor=extractor_html):
+        videos_concurrency = videos_concurrency or self.core.configuration.videos_concurrency
+        pages_concurrency = pages_concurrency or self.core.configuration.pages_concurrency
+        assert videos_concurrency and pages_concurrency
+        async for video in self.iterator(target_page_urls=page_urls, video_link_extractor=extractor_account,
+                                         max_video_concurrency=videos_concurrency,
+                                         max_page_concurrency=pages_concurrency):
+
             yield await video.init()
 
-    async def get_playlist(self, url: str, pages: int = 2, videos_concurrency: int = None,
-                     pages_concurrency: int = None) -> AsyncGenerator[Video, None]:
+    async def get_playlist(self, url: str, pages: int = 2, videos_concurrency: int | None = None,
+                     pages_concurrency: int | None = None) -> AsyncGenerator[Video, None]:
         page_urls = [f"{url}/{page}" for page in range(pages)]
-        videos_concurrency = videos_concurrency or self.core.config.videos_concurrency
-        pages_concurrency = pages_concurrency or self.core.config.pages_concurrency
-        
-        async for video in self.iterator(page_urls=page_urls, extractor=extractor_html, videos_concurrency=videos_concurrency, pages_concurrency=pages_concurrency):
-             yield await video.init()
+        videos_concurrency = videos_concurrency or self.core.configuration.videos_concurrency
+        pages_concurrency = pages_concurrency or self.core.configuration.pages_concurrency
+        assert videos_concurrency and pages_concurrency
+
+        async for video in self.iterator(target_page_urls=page_urls, video_link_extractor=extractor_account,
+                                         max_video_concurrency=videos_concurrency,
+                                         max_page_concurrency=pages_concurrency):
+
+            yield await video.init()
 
     async def get_pornstar(self, url) -> Pornstar:
-        pornstar = Pornstar(url, core=self.core)
+        pornstar = Pornstar(core=self.core, url=url)
         return await pornstar.init()
 
     async def get_channel(self, url) -> Channel:
@@ -655,7 +714,7 @@ async def run_main():
                         help="Whether to apply video title automatically to output path or not", required=True)
 
     args = parser.parse_args()
-    no_title = BaseCore().str_to_bool(args.no_title)
+    no_title = str_to_bool(args.no_title)
     if args.download:
         client = Client()
         video = await client.get_video(args.download)
