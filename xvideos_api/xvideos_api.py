@@ -100,7 +100,7 @@ session_token_auth = <token>
 
 
     async def get_recommended_videos(self, pages: int = 2, videos_concurrency: int | None = None,
-                                     pages_concurrency: int | None = None) -> AsyncGenerator[Video, None]:
+                                     pages_concurrency: int | None = None) -> AsyncGenerator['Video', None]:
 
         page_urls = [f"https://www.xvideos.com/history/{page}" for page in range(pages)]
         videos_concurrency = videos_concurrency or self.core.configuration.videos_concurrency
@@ -115,7 +115,7 @@ session_token_auth = <token>
             yield await video.init()
 
     async def get_liked_videos(self, pages: int = 2, videos_concurrency: int | None = None,
-                                     pages_concurrency: int | None = None) -> AsyncGenerator[Video, None]:
+                                     pages_concurrency: int | None = None) -> AsyncGenerator['Video', None]:
 
         page_urls = [f"https://www.xvideos.com/videos-i-like/{page}" for page in range(pages)]
         videos_concurrency = videos_concurrency or self.core.configuration.videos_concurrency
@@ -128,7 +128,7 @@ session_token_auth = <token>
 
             yield await video.init()
     async def get_watch_later_videos(self, pages: int = 2, videos_concurrency: int | None = None,
-                                     pages_concurrency: int | None = None) -> AsyncGenerator[Video, None]:
+                                     pages_concurrency: int | None = None) -> AsyncGenerator['Video', None]:
 
         page_urls = [f"https://www.xvideos.com/watch-later/{page}" for page in range(pages)]
         videos_concurrency = videos_concurrency or self.core.configuration.videos_concurrency
