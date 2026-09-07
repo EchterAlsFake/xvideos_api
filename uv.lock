@@ -166,7 +166,7 @@ wheels = [
 
 [[package]]
 name = "eaf-base-api"
-version = "4.0.0"
+version = "4.1.1"
 source = { editable = "../eaf_base_api" }
 dependencies = [
     { name = "cachetools" },
@@ -309,7 +309,7 @@ wheels = [
 
 [[package]]
 name = "unofficial-api-for-xvideos"
-version = "2.4"
+version = "2.5"
 source = { editable = "." }
 dependencies = [
     { name = "curl-cffi" },

@@ -1,40 +1,25 @@
+from base_api.modules.errors import (
+    NotFound,
+    NetworkError,
+    BotDetection,
+    ProxyError,
+    UnknownNetworkError,
+    DownloadFailed,
+)
+
+
 class NoLoginCookies(Exception):
     def __init__(self, msg):
         super().__init__(msg)
         self.msg = msg
 
 
-class NotFound(Exception):
-    def __init__(self, msg: str):
-        super().__init__(msg)
-        self.msg = msg
-
-
-class NetworkError(Exception):
-    def __init__(self, msg: str):
-        super().__init__(msg)
-        self.msg = msg
-
-
-class BotDetection(Exception):
-    def __init__(self, msg: str):
-        super().__init__(msg)
-        self.msg = msg
-
-
-class ProxyError(Exception):
-    def __init__(self, msg: str):
-        super().__init__(msg)
-        self.msg = msg
-
-
-class UnknownNetworkError(Exception):
-    def __init__(self, msg):
-        super().__init__(msg)
-        self.msg = msg
-
-
-class DownloadFailed(Exception):
-    def __init__(self, message: str):
-        super().__init__(message)
-        self.message = message
+__all__ = [
+    "NoLoginCookies",
+    "NotFound",
+    "NetworkError",
+    "BotDetection",
+    "ProxyError",
+    "UnknownNetworkError",
+    "DownloadFailed",
+]

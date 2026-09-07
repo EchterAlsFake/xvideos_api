@@ -55,8 +55,12 @@ Repository = "https://github.com/EchterAlsFake/unofficial-api-for-xvideos"
 "Donate via Crypto" = "https://nowpayments.io/donation/EchterAlsFake"
 
 [project.scripts]
-xvideos_api = "xvideos_api.xvideos_api:main"
+xvideos_api = "xvideos_api.api:main"
+
 
 [tool.uv.build-backend]
 module-name = "xvideos_api"
 module-root = ""
+
+[tool.uv.sources]
+eaf-base-api = { path = "../eaf_base_api", editable = true }
