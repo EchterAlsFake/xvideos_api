@@ -7,6 +7,8 @@ import json
 import html
 import asyncio
 import argparse
+
+from base_api.modules.logger import configure_app_logging
 import logging
 from typing import AsyncGenerator, ClassVar
 from dataclasses import dataclass
@@ -35,6 +37,7 @@ from base_api import (
     scrape_stream,
 )
 from base_api.modules.errors import (
+    DownloadCancelled,
     BotProtectionDetected,
     HTTPStatusError,
     InvalidProxy,
@@ -65,21 +68,30 @@ async def get_html_content(core: BaseCore, url: str) -> str:
         return await core.fetch_text(url)
 
     except HTTPStatusError as e:
+        logger.exception("Request failed for %s: %s", url, e)
         if e.status_code == 404:
             raise NotFound(f"Server returned 404 for: {url}") from e
-        raise
+        raise NetworkError(f"Request failed for {url}: {e}") from e
 
     except NetworkRequestError as e:
-        raise NetworkError(str(e)) from e
+        logger.exception("Request failed for %s: %s", url, e)
+        raise NetworkError(f"Request failed for {url}: {e}") from e
 
     except InvalidProxy as e:
-        raise ProxyError(str(e)) from e
+        logger.exception("Request failed for %s: %s", url, e)
+        raise ProxyError(f"Request failed for {url}: {e}") from e
 
     except BotProtectionDetected as e:
-        raise BotDetection(str(e)) from e
+        logger.exception("Request failed for %s: %s", url, e)
+        raise BotDetection(f"Request failed for {url}: {e}") from e
 
     except UnknownError as e:
-        raise UnknownNetworkError(str(e)) from e
+        logger.exception("Request failed for %s: %s", url, e)
+        raise UnknownNetworkError(f"Request failed for {url}: {e}") from e
+
+    except Exception:
+        logger.exception("Failed to fetch or decode response for %s", url)
+        raise
 
 
 class Account:
@@ -188,10 +200,10 @@ class Video(BaseMedia):
 
     async def _load_html(self) -> dict[str, object]:
         html_content = await get_html_content(core=self.core, url=self.url)
-        return await asyncio.to_thread(self._extract_html, html_content)
+        return await asyncio.to_thread(self._extract_html, html_content, self.url)
 
     @staticmethod
-    def _extract_html(html_content: str) -> dict:
+    def _extract_html(html_content: str, url: str | None = None) -> dict:
         parser = LexborHTMLParser(html_content)
 
         data = {}
@@ -200,7 +212,8 @@ class Video(BaseMedia):
                 continue
             try:
                 data.update(json.loads(s.text()))
-            except Exception:
+            except (TypeError, ValueError):
+                logger.warning("Skipping invalid JSON-LD metadata for %s", url, exc_info=True)
                 continue
 
         title = html.unescape(data.get("name"))
@@ -267,20 +280,21 @@ class Video(BaseMedia):
         :param configuration:
         :return:
         """
-        await self.load_fields("title", "m3u8_base_url")
-        config = copy.deepcopy(configuration)
-        if not config.no_title:
-            config.path = os.path.join(config.path, f"{self.title}.mp4")
-
-        config.m3u8_base_url = self.m3u8_base_url
-
         try:
+            await self.load_fields("title", "m3u8_base_url")
+            config = copy.deepcopy(configuration)
+            if not config.no_title:
+                config.path = os.path.join(config.path, f"{self.title}.mp4")
+
+            config.m3u8_base_url = self.m3u8_base_url
+
             logger.info(f"Downloading video: {self.title}")
             return await self.core.download(configuration=config)
-
-        except Exception as e: 
-            logger.error(f"Failed to download video {self.title}: {e}")
-            raise DownloadFailed(str(e))
+        except DownloadCancelled:
+            raise
+        except Exception as e:
+            logger.exception("Download failed for %s: %s", self.url, e)
+            raise DownloadFailed(f"Download failed for {self.url}: {e}") from e
 
     @property
     async def get_author(self, load_html: bool = True) -> Channel | None:
@@ -356,7 +370,7 @@ class BaseChannelPornstar(BaseMedia):
         try:
             total_video_views = parser.css_first('#pinfo-videos-views span').text(strip=True)
 
-        except:
+        except AttributeError:
             paragraphs = parser.css('#pfinfo-col-col1 p')
             # Assuming 'Total Videoaufrufe' is always the 5th <p> tag (index 4)
             if len(paragraphs) > 4:
@@ -365,7 +379,7 @@ class BaseChannelPornstar(BaseMedia):
         signed_up = parser.css_first('#pinfo-signedup span').text(strip=True)
         try:
             last_activity = parser.css_first('#pinfo-lastactivity span').text(strip=True)
-        except:
+        except AttributeError:
             last_activity = None # Can be None sometimes, because it's not always available on the page lol
 
         names = parser.css('#pinfo-workedfor a')
@@ -451,7 +465,7 @@ class Pornstar(BaseChannelPornstar):
         data["gender"] = parser.css_first('#pinfo-sex span').text(strip=True)
         try:
             data["age"] = parser.css_first('#pinfo-age span').text(strip=True)
-        except:
+        except AttributeError:
             data["age"] = None
 
         data["video_tags"] = parser.css_first('#pinfo-video-tags span').text(strip=True)
@@ -603,10 +617,12 @@ async def run_main(args_list: list[str] | None = None):
             await video.download(configuration=config)
             print(f"Download complete: {title}")
         except Exception as e:
+            logger.exception("CLI failed while processing %s", url)
             print(f"Error downloading {url}: {e}")
 
 
 def main():
+    configure_app_logging(level=logging.INFO)
     try:
         asyncio.run(run_main())
     except KeyboardInterrupt:
@@ -615,4 +631,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
