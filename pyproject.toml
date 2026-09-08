@@ -61,6 +61,3 @@ xvideos_api = "xvideos_api.api:main"
 [tool.uv.build-backend]
 module-name = "xvideos_api"
 module-root = ""
-
-[tool.uv.sources]
-eaf-base-api = { path = "../eaf_base_api", editable = true }
